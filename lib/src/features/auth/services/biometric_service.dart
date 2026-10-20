@@ -33,6 +33,13 @@ final class BiometricService {
 
   Future<void> disable() => _storage.delete(key: OpenLockKeys.biometricEnabled);
 
+  /// A fresh prompt for an in-app re-auth gate; false when biometric unlock
+  /// is off.
+  Future<bool> confirm(String reason) async {
+    if (!await isEnabled()) return false;
+    return _biometric.authenticate(reason: reason);
+  }
+
   /// Shows the biometric prompt. Returns true on success.
   Future<bool> authenticate() async {
     if (!await isEnabled()) return false;

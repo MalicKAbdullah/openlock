@@ -92,44 +92,65 @@ packages:
   core_crypto:
     dependency: "direct main"
     description:
-      path: "../../packages-design/core_crypto"
-      relative: true
-    source: path
+      path: core_crypto
+      ref: cbb18027fe47f685caff8d2252212d8042f1e45c
+      resolved-ref: cbb18027fe47f685caff8d2252212d8042f1e45c
+      url: "https://github.com/MalicKAbdullah/secure-suite-core.git"
+    source: git
     version: "0.0.1"
+  core_lock:
+    dependency: "direct main"
+    description:
+      path: core_lock
+      ref: cbb18027fe47f685caff8d2252212d8042f1e45c
+      resolved-ref: cbb18027fe47f685caff8d2252212d8042f1e45c
+      url: "https://github.com/MalicKAbdullah/secure-suite-core.git"
+    source: git
+    version: "0.3.0"
   core_security:
     dependency: "direct main"
     description:
-      path: "../../packages-design/core_security"
-      relative: true
-    source: path
+      path: core_security
+      ref: cbb18027fe47f685caff8d2252212d8042f1e45c
+      resolved-ref: cbb18027fe47f685caff8d2252212d8042f1e45c
+      url: "https://github.com/MalicKAbdullah/secure-suite-core.git"
+    source: git
     version: "0.0.1"
   core_storage:
     dependency: "direct main"
     description:
-      path: "../../packages-design/core_storage"
-      relative: true
-    source: path
+      path: core_storage
+      ref: cbb18027fe47f685caff8d2252212d8042f1e45c
+      resolved-ref: cbb18027fe47f685caff8d2252212d8042f1e45c
+      url: "https://github.com/MalicKAbdullah/secure-suite-core.git"
+    source: git
     version: "0.0.1"
   core_theme:
     dependency: "direct main"
     description:
-      path: "../../packages-design/core_theme"
-      relative: true
-    source: path
+      path: core_theme
+      ref: cbb18027fe47f685caff8d2252212d8042f1e45c
+      resolved-ref: cbb18027fe47f685caff8d2252212d8042f1e45c
+      url: "https://github.com/MalicKAbdullah/secure-suite-core.git"
+    source: git
     version: "0.2.0"
   core_ui:
     dependency: "direct main"
     description:
-      path: "../../packages-design/core_ui"
-      relative: true
-    source: path
+      path: core_ui
+      ref: cbb18027fe47f685caff8d2252212d8042f1e45c
+      resolved-ref: cbb18027fe47f685caff8d2252212d8042f1e45c
+      url: "https://github.com/MalicKAbdullah/secure-suite-core.git"
+    source: git
     version: "0.0.1"
   core_update:
     dependency: "direct main"
     description:
-      path: "../../packages-design/core_update"
-      relative: true
-    source: path
+      path: core_update
+      ref: cbb18027fe47f685caff8d2252212d8042f1e45c
+      resolved-ref: cbb18027fe47f685caff8d2252212d8042f1e45c
+      url: "https://github.com/MalicKAbdullah/secure-suite-core.git"
+    source: git
     version: "0.2.0"
   crypto:
     dependency: transitive

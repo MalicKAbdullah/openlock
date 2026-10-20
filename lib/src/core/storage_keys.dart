@@ -12,6 +12,11 @@ abstract final class OpenLockKeys {
   static const String failedAttempts = 'openlock_failed_attempts';
   static const String lockoutUntil = 'openlock_lockout_until';
 
+  /// Argon2id verifier of the recovery key (`base64(salt):base64(hash)`) and
+  /// whether its one-time offer to existing users has been shown.
+  static const String recoveryVerifier = 'openlock_recovery_verifier';
+  static const String recoveryOffered = 'openlock_recovery_offered';
+
   static const String biometricEnabled = 'openlock_biometric_enabled';
   static const String onboardingSeen = 'openlock_onboarding_seen';
 
@@ -21,6 +26,8 @@ abstract final class OpenLockKeys {
     pinSalt,
     failedAttempts,
     lockoutUntil,
+    recoveryVerifier,
+    recoveryOffered,
     biometricEnabled,
     onboardingSeen,
   ];
