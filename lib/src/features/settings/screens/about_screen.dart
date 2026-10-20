@@ -1,14 +1,15 @@
 import 'package:core_theme/core_theme.dart';
 import 'package:core_ui/core_ui.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:openlock/src/core/app_info.dart';
 import 'package:openlock/src/core/widgets/screen_header.dart';
 
-class AboutScreen extends StatelessWidget {
+class AboutScreen extends ConsumerWidget {
   const AboutScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final c = SuiteColors.of(context);
     return Scaffold(
       appBar: AppBar(title: const Text('About')),
@@ -26,7 +27,7 @@ class AboutScreen extends StatelessWidget {
                     style: AppTextStyles.h1.copyWith(color: c.textPrimary),
                   ),
                   Text(
-                    'Version ${AppInfo.version}',
+                    'Version ${ref.watch(appVersionProvider).valueOrNull ?? ''}',
                     style: AppTextStyles.bodySmall.copyWith(
                       color: c.textSecondary,
                     ),
