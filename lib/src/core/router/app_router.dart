@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:openlock/src/core/shell/home_shell.dart';
 import 'package:openlock/src/features/apps/screens/app_picker_screen.dart';
 import 'package:openlock/src/features/auth/providers/auth_providers.dart';
+import 'package:openlock/src/features/auth/screens/recovery_offer_screen.dart';
 import 'package:openlock/src/features/auth/screens/setup_pin_screen.dart';
 import 'package:openlock/src/features/auth/screens/unlock_screen.dart';
 import 'package:openlock/src/features/backup/screens/backup_screen.dart';
@@ -22,6 +23,7 @@ abstract final class AppRoutes {
   static const String onboarding = '/onboarding';
   static const String setup = '/setup';
   static const String unlock = '/unlock';
+  static const String recoveryOffer = '/recovery-key';
   static const String permissions = '/permissions';
   static const String apps = '/apps';
   static const String schedules = '/schedules';
@@ -42,7 +44,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   ref
     ..onDispose(refresh.dispose)
     ..listen(sessionProvider, (_, __) => refresh.value++)
-    ..listen(onboardingSeenProvider, (_, __) => refresh.value++);
+    ..listen(onboardingSeenProvider, (_, __) => refresh.value++)
+    ..listen(recoveryOfferProvider, (_, __) => refresh.value++);
 
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
@@ -62,7 +65,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         case AuthStatus.locked:
           return location == AppRoutes.unlock ? null : AppRoutes.unlock;
         case AuthStatus.unlocked:
+          if (ref.read(recoveryOfferProvider) != null) {
+            return location == AppRoutes.recoveryOffer
+                ? null
+                : AppRoutes.recoveryOffer;
+          }
           const gates = {
+            AppRoutes.recoveryOffer,
             AppRoutes.splash,
             AppRoutes.onboarding,
             AppRoutes.setup,
@@ -88,6 +97,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.unlock,
         builder: (_, __) => const UnlockScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.recoveryOffer,
+        builder: (_, __) => const RecoveryOfferScreen(),
       ),
       GoRoute(
         path: AppRoutes.permissions,
