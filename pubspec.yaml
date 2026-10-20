@@ -13,6 +13,7 @@ dependencies:
 
   # State management
   flutter_riverpod: ^2.5.1
+  package_info_plus: ^8.0.0
 
   # Navigation
   go_router: ^14.2.0

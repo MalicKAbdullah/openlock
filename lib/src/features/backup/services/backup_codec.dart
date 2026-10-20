@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:core_crypto/core_crypto.dart';
-import 'package:openlock/src/core/app_info.dart';
 import 'package:openlock/src/core/clock.dart';
 import 'package:openlock/src/core/interfaces/key_derivation.dart';
 import 'package:openlock/src/features/enforcement/models/lock_config.dart';
@@ -30,13 +29,16 @@ final class BackupCodec {
   const BackupCodec({
     required IKeyDerivation keyDerivation,
     required CipherService cipher,
+    required Future<String> Function() appVersion,
     required Clock clock,
   })  : _kdf = keyDerivation,
         _cipher = cipher,
+        _appVersion = appVersion,
         _clock = clock;
 
   final IKeyDerivation _kdf;
   final CipherService _cipher;
+  final Future<String> Function() _appVersion;
   final Clock _clock;
 
   static const int formatVersion = 1;
@@ -59,7 +61,7 @@ final class BackupCodec {
     return jsonEncode({
       'formatVersion': formatVersion,
       'app': 'openlock',
-      'appVersion': AppInfo.version,
+      'appVersion': await _appVersion(),
       'createdAt': _clock.now().toIso8601String(),
       'salt': base64Encode(salt),
       'nonce': base64Encode(payload.nonce),

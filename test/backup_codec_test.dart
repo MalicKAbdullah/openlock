@@ -14,6 +14,7 @@ void main() {
     codec = BackupCodec(
       keyDerivation: const FakeKeyDerivation(),
       cipher: const CipherService(),
+      appVersion: () async => '9.9.9',
       clock: FakeClock(DateTime(2026, 7, 8)),
     );
   });
