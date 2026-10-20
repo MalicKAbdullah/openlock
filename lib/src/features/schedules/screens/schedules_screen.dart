@@ -1,9 +1,9 @@
-import 'package:core_theme/core_theme.dart';
 import 'package:core_ui/core_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:openlock/src/core/router/app_router.dart';
+import 'package:openlock/src/core/widgets/screen_header.dart';
 import 'package:openlock/src/features/enforcement/models/lock_config.dart';
 import 'package:openlock/src/features/enforcement/providers/config_providers.dart';
 import 'package:openlock/src/features/schedules/models/lock_schedule.dart';
@@ -18,39 +18,49 @@ class SchedulesScreen extends ConsumerWidget {
         ref.watch(configControllerProvider).valueOrNull ?? LockConfig.empty;
     final schedules = config.schedules;
 
+    final active = schedules.where((s) => s.enabled).length;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Focus schedules')),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => context.push(AppRoutes.newSchedule),
         icon: const Icon(Icons.add),
         label: const Text('New'),
       ),
       body: SafeArea(
-        child: schedules.isEmpty
-            ? const VaultEmptyState(
+        bottom: false,
+        child: PageList(
+          bottomPadding: 96,
+          children: [
+            ScreenHeader(
+              eyebrow: schedules.isEmpty
+                  ? 'Lock by the clock'
+                  : '$active of ${schedules.length} on',
+              title: 'Schedules',
+            ),
+            if (schedules.isEmpty)
+              const AppEmptyState(
                 icon: Icons.schedule_rounded,
-                message:
-                    'No schedules yet.\nLock chosen apps during set hours — '
-                    'like social apps 9-5 on weekdays.',
+                title: 'No schedules yet',
+                message: 'Lock chosen apps during set hours, like social apps '
+                    '9-5 on weekdays.',
               )
-            : ListView.separated(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                itemCount: schedules.length,
-                separatorBuilder: (_, __) =>
-                    const SizedBox(height: AppSpacing.sm),
-                itemBuilder: (context, index) {
-                  final schedule = schedules[index];
-                  return _ScheduleCard(
-                    schedule: schedule,
-                    onTap: () => context.push(
-                      '${AppRoutes.editSchedule}/${schedule.id}',
+            else
+              RowGroup(
+                children: [
+                  for (final schedule in schedules)
+                    _ScheduleCard(
+                      schedule: schedule,
+                      onTap: () => context.push(
+                        '${AppRoutes.editSchedule}/${schedule.id}',
+                      ),
+                      onToggle: (value) => ref
+                          .read(configControllerProvider.notifier)
+                          .upsertSchedule(schedule.copyWith(enabled: value)),
                     ),
-                    onToggle: (value) => ref
-                        .read(configControllerProvider.notifier)
-                        .upsertSchedule(schedule.copyWith(enabled: value)),
-                  );
-                },
+                ],
               ),
+          ],
+        ),
       ),
     );
   }
@@ -69,34 +79,14 @@ class _ScheduleCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return VaultCard(
+    final count = schedule.packages.length;
+    return DetailRow(
       onTap: onTap,
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(schedule.name, style: AppTextStyles.h4),
-                const SizedBox(height: 2),
-                Text(
-                  ScheduleFormat.summary(schedule),
-                  style: AppTextStyles.bodySmall
-                      .copyWith(color: scheme.onSurfaceVariant),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '${schedule.packages.length} apps',
-                  style: AppTextStyles.caption
-                      .copyWith(color: scheme.onSurfaceVariant),
-                ),
-              ],
-            ),
-          ),
-          Switch(value: schedule.enabled, onChanged: onToggle),
-        ],
-      ),
+      leading: const IconBadge(icon: Icons.schedule_rounded),
+      title: schedule.name,
+      detail: '${ScheduleFormat.summary(schedule)}\n'
+          '$count ${count == 1 ? 'app' : 'apps'}',
+      trailing: Switch(value: schedule.enabled, onChanged: onToggle),
     );
   }
 }

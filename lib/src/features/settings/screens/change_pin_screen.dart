@@ -74,28 +74,34 @@ class _ChangePinScreenState extends ConsumerState<ChangePinScreen> {
       appBar: AppBar(title: const Text('Change PIN')),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(AppSpacing.lg),
+          padding: const EdgeInsets.all(AppSpacing.gutter),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              VaultTextField(
+              AppTextField(
                 label: 'Current PIN',
                 controller: _oldController,
                 obscureText: true,
+                monospace: true,
+                clearable: false,
                 keyboardType: TextInputType.number,
               ),
-              const SizedBox(height: AppSpacing.lg),
-              VaultTextField(
+              const SizedBox(height: AppSpacing.md),
+              AppTextField(
                 label: 'New PIN',
                 controller: _newController,
                 obscureText: true,
+                monospace: true,
+                clearable: false,
                 keyboardType: TextInputType.number,
               ),
-              const SizedBox(height: AppSpacing.lg),
-              VaultTextField(
+              const SizedBox(height: AppSpacing.md),
+              AppTextField(
                 label: 'Confirm new PIN',
                 controller: _confirmController,
                 obscureText: true,
+                monospace: true,
+                clearable: false,
                 keyboardType: TextInputType.number,
                 errorText: _error,
                 onSubmitted: (_) => _submit(),

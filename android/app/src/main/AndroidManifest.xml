@@ -34,7 +34,8 @@
     <application
         android:label="OpenLock"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round">
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -55,7 +56,7 @@
         </activity>
 
         <!-- The on-top lock screen shown over a locked app. Native for
-             reliability; dark + amber to match the brand; FLAG_SECURE set in
+             reliability; dark + cyan to match the brand; FLAG_SECURE set in
              code. Not exported — only OpenLock's own service launches it. -->
         <activity
             android:name=".LockActivity"

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:core_theme/core_theme.dart';
+import 'package:core_ui/core_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:openlock/src/core/di.dart';
@@ -89,67 +90,67 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final c = SuiteColors.of(context);
     final coolingDown = _cooldown > Duration.zero;
     return Scaffold(
       body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 88,
-                  height: 88,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: scheme.primaryContainer.withValues(alpha: 0.6),
-                    border: Border.all(
-                      color: scheme.primary.withValues(alpha: 0.4),
-                    ),
+        child: Column(
+          children: [
+            Expanded(
+              child: Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SuiteAppIcon(app: SuiteApp.openlock, size: 72),
+                      const SizedBox(height: AppSpacing.md),
+                      Text(
+                        'OpenLock',
+                        style: AppTextStyles.h1.copyWith(color: c.textPrimary),
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        'Enter your PIN to unlock',
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          color: c.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      SizedBox(
+                        height: 20,
+                        child: Text(
+                          coolingDown
+                              ? 'Too many attempts. Try again in '
+                                  '${_cooldown.inSeconds}s'
+                              : (_message ?? ''),
+                          style: AppTextStyles.caption.copyWith(
+                            color: c.negative,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      PinEntryPanel(
+                        key: _panelKey,
+                        enabled: !coolingDown,
+                        onSubmit: _submit,
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      TextButton.icon(
+                        onPressed: coolingDown ? null : _tryBiometric,
+                        icon: const Icon(Icons.fingerprint),
+                        label: const Text('Use fingerprint'),
+                      ),
+                    ],
                   ),
-                  child: Icon(
-                    Icons.lock_outline,
-                    size: 44,
-                    color: scheme.primary,
-                  ),
                 ),
-                const SizedBox(height: AppSpacing.lg),
-                const Text('OpenLock', style: AppTextStyles.h1),
-                const SizedBox(height: AppSpacing.sm),
-                Text(
-                  'Enter your PIN to unlock',
-                  style: AppTextStyles.bodyMedium.copyWith(
-                    color: scheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                SizedBox(
-                  height: 20,
-                  child: Text(
-                    coolingDown
-                        ? 'Too many attempts. Try again in '
-                            '${_cooldown.inSeconds}s'
-                        : (_message ?? ''),
-                    style: AppTextStyles.caption.copyWith(color: scheme.error),
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                PinEntryPanel(
-                  key: _panelKey,
-                  enabled: !coolingDown,
-                  onSubmit: _submit,
-                ),
-                const SizedBox(height: AppSpacing.md),
-                TextButton.icon(
-                  onPressed: coolingDown ? null : _tryBiometric,
-                  icon: const Icon(Icons.fingerprint),
-                  label: const Text('Use fingerprint'),
-                ),
-              ],
+              ),
             ),
-          ),
+            const Padding(
+              padding: EdgeInsets.only(bottom: AppSpacing.md),
+              child: SuiteEndorsement(),
+            ),
+          ],
         ),
       ),
     );

@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openlock/src/core/di.dart';
 import 'package:openlock/src/core/interfaces/enforcement_bridge.dart';
-import 'package:openlock/src/core/theme.dart';
 import 'package:openlock/src/features/apps/screens/app_picker_screen.dart';
 
 import '../helpers/fakes.dart';
@@ -18,6 +17,10 @@ void main() {
       ],
     );
 
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(400, 1400);
+    addTearDown(tester.view.reset);
+
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -26,7 +29,7 @@ void main() {
           configFileStoreProvider.overrideWithValue(FakeConfigFileStore()),
         ],
         child: MaterialApp(
-          theme: AppTheme.build(Brightness.light, accent: openlockAccent),
+          theme: AppTheme.build(Brightness.light, accent: AppAccents.openlock),
           home: const AppPickerScreen(),
         ),
       ),
@@ -39,8 +42,7 @@ void main() {
     expect(find.text('0 locked'), findsOneWidget);
 
     // Toggle the first app's switch on.
-    final firstSwitch =
-        find.byType(SwitchListTile).at(1); // 0 = "lock new apps"
+    final firstSwitch = find.byType(Switch).at(1); // 0 = "lock new apps"
     await tester.tap(firstSwitch);
     await tester.pumpAndSettle();
 

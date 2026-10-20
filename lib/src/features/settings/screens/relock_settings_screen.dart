@@ -1,4 +1,6 @@
 import 'package:core_theme/core_theme.dart';
+import 'package:core_ui/core_ui.dart';
+import 'package:openlock/src/core/widgets/screen_header.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:openlock/src/features/enforcement/models/lock_config.dart';
@@ -23,58 +25,89 @@ class RelockSettingsScreen extends ConsumerWidget {
           onChanged: (mode) {
             if (mode != null) controller.setRelock(policy.copyWith(mode: mode));
           },
-          child: ListView(
-            padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+          child: PageList(
             children: [
               Padding(
-                padding: const EdgeInsets.all(AppSpacing.md),
+                padding: const EdgeInsets.only(bottom: AppSpacing.md),
                 child: Text(
                   'When should a locked app relock after you unlock it?',
                   style: AppTextStyles.bodyMedium.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    color: SuiteColors.of(context).textSecondary,
                   ),
                 ),
               ),
-              const RadioListTile<RelockMode>(
-                value: RelockMode.immediately,
-                title: Text('When you leave the app'),
-                subtitle: Text('Relocks the instant you switch away'),
-              ),
-              const RadioListTile<RelockMode>(
-                value: RelockMode.afterTimeout,
-                title: Text('After a timeout'),
-                subtitle: Text('Stays open briefly if you come back'),
-              ),
-              if (policy.mode == RelockMode.afterTimeout)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.lg,
-                    0,
-                    AppSpacing.lg,
-                    AppSpacing.sm,
+              RowGroup(
+                separatorIndent: AppSpacing.md,
+                children: [
+                  _ModeRow(
+                    mode: RelockMode.immediately,
+                    title: 'When you leave the app',
+                    subtitle: 'Relocks the instant you switch away',
+                    onSelect: () => controller.setRelock(
+                        policy.copyWith(mode: RelockMode.immediately)),
                   ),
-                  child: Wrap(
-                    spacing: AppSpacing.sm,
-                    children: [
-                      for (final choice in RelockPolicy.timeoutChoices)
-                        ChoiceChip(
-                          label: Text('${choice.inMinutes} min'),
-                          selected: policy.timeout == choice,
-                          onSelected: (_) => controller
-                              .setRelock(policy.copyWith(timeout: choice)),
-                        ),
-                    ],
+                  _ModeRow(
+                    mode: RelockMode.afterTimeout,
+                    title: 'After a timeout',
+                    subtitle: 'Stays open briefly if you come back',
+                    onSelect: () => controller.setRelock(
+                      policy.copyWith(mode: RelockMode.afterTimeout),
+                    ),
                   ),
+                  _ModeRow(
+                    mode: RelockMode.onScreenOff,
+                    title: 'When the screen turns off',
+                    subtitle: 'Stays open across app switches',
+                    onSelect: () => controller.setRelock(
+                      policy.copyWith(mode: RelockMode.onScreenOff),
+                    ),
+                  ),
+                ],
+              ),
+              if (policy.mode == RelockMode.afterTimeout) ...[
+                const SectionLead('Timeout'),
+                Wrap(
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.sm,
+                  children: [
+                    for (final choice in RelockPolicy.timeoutChoices)
+                      AppChip(
+                        label: '${choice.inMinutes} min',
+                        selected: policy.timeout == choice,
+                        onTap: () => controller
+                            .setRelock(policy.copyWith(timeout: choice)),
+                      ),
+                  ],
                 ),
-              const RadioListTile<RelockMode>(
-                value: RelockMode.onScreenOff,
-                title: Text('When the screen turns off'),
-                subtitle: Text('Stays open across app switches'),
-              ),
+              ],
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+class _ModeRow extends StatelessWidget {
+  const _ModeRow({
+    required this.mode,
+    required this.title,
+    required this.subtitle,
+    required this.onSelect,
+  });
+
+  final RelockMode mode;
+  final String title;
+  final String subtitle;
+  final VoidCallback onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppListRow(
+      title: title,
+      subtitle: subtitle,
+      onTap: onSelect,
+      trailing: Radio<RelockMode>(value: mode),
     );
   }
 }

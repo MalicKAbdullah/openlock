@@ -2,7 +2,6 @@ import 'package:core_theme/core_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:openlock/src/core/router/app_router.dart';
-import 'package:openlock/src/core/theme.dart';
 
 class OpenLockApp extends ConsumerWidget {
   const OpenLockApp({super.key});
@@ -12,8 +11,8 @@ class OpenLockApp extends ConsumerWidget {
     final router = ref.watch(appRouterProvider);
     return MaterialApp.router(
       title: 'OpenLock',
-      theme: AppTheme.build(Brightness.light, accent: openlockAccent),
-      darkTheme: AppTheme.build(Brightness.dark, accent: openlockAccent),
+      theme: AppTheme.build(Brightness.light, accent: AppAccents.openlock),
+      darkTheme: AppTheme.build(Brightness.dark, accent: AppAccents.openlock),
       themeMode: ThemeMode.system,
       routerConfig: router,
       debugShowCheckedModeBanner: false,

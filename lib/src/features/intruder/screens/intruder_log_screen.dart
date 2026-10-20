@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:openlock/src/core/interfaces/enforcement_bridge.dart';
+import 'package:openlock/src/core/widgets/screen_header.dart';
 import 'package:openlock/src/features/intruder/providers/intruder_providers.dart';
 
 class IntruderLogScreen extends ConsumerWidget {
@@ -16,113 +17,103 @@ class IntruderLogScreen extends ConsumerWidget {
     final async = ref.watch(intruderControllerProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Intruder log'),
-        actions: [
-          IconButton(
-            onPressed: () =>
-                ref.read(intruderControllerProvider.notifier).refresh(),
-            icon: const Icon(Icons.refresh),
-          ),
-          if ((async.valueOrNull ?? const []).isNotEmpty)
-            IconButton(
-              onPressed: () =>
-                  ref.read(intruderControllerProvider.notifier).clearAll(),
-              icon: const Icon(Icons.delete_sweep_outlined),
-            ),
-        ],
-      ),
       body: SafeArea(
+        bottom: false,
         child: async.when(
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (_, __) => const VaultEmptyState(
-            icon: Icons.error_outline,
-            message: 'Could not load the intruder log.',
+          error: (_, __) => const AppEmptyState(
+            icon: Icons.error_outline_rounded,
+            title: 'Could not load the log',
           ),
-          data: (records) {
-            if (records.isEmpty) {
-              return const VaultEmptyState(
-                icon: Icons.verified_user_outlined,
-                message:
-                    'No intruder events.\nIf someone fails your PIN too many '
-                    'times, a snapshot appears here.',
-              );
-            }
-            return ListView.separated(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              itemCount: records.length,
-              separatorBuilder: (_, __) =>
-                  const SizedBox(height: AppSpacing.sm),
-              itemBuilder: (context, index) => _IntruderCard(
-                record: records[index],
-                onDelete: () => ref
-                    .read(intruderControllerProvider.notifier)
-                    .delete(records[index].id),
+          data: (records) => PageList(
+            children: [
+              ScreenHeader(
+                eyebrow: 'Failed unlocks',
+                title: 'Intruders',
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      tooltip: 'Refresh',
+                      onPressed: () => ref
+                          .read(intruderControllerProvider.notifier)
+                          .refresh(),
+                      icon: const Icon(Icons.refresh_rounded),
+                    ),
+                    if (records.isNotEmpty)
+                      IconButton(
+                        tooltip: 'Clear all',
+                        onPressed: () => ref
+                            .read(intruderControllerProvider.notifier)
+                            .clearAll(),
+                        icon: const Icon(Icons.delete_sweep_outlined),
+                      ),
+                  ],
+                ),
               ),
-            );
-          },
+              if (records.isEmpty)
+                const AppEmptyState(
+                  icon: Icons.verified_user_outlined,
+                  title: 'No intruder events',
+                  message: 'If someone fails your PIN too many times, a '
+                      'snapshot appears here.',
+                )
+              else
+                RowGroup(
+                  separatorIndent: 84,
+                  children: [
+                    for (final record in records)
+                      _IntruderRow(
+                        record: record,
+                        onDelete: () => ref
+                            .read(intruderControllerProvider.notifier)
+                            .delete(record.id),
+                      ),
+                  ],
+                ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _IntruderCard extends StatelessWidget {
-  const _IntruderCard({required this.record, required this.onDelete});
+class _IntruderRow extends StatelessWidget {
+  const _IntruderRow({required this.record, required this.onDelete});
 
   final IntruderRecord record;
   final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final c = SuiteColors.of(context);
     final when = DateFormat.yMMMd().add_jm().format(record.timestamp);
     final photo = record.photoPath;
     final hasPhoto = photo != null && File(photo).existsSync();
-    return VaultCard(
-      child: Row(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(AppSpacing.sm),
-            child: SizedBox(
-              width: 56,
-              height: 56,
-              child: hasPhoto
-                  ? Image.file(File(photo), fit: BoxFit.cover)
-                  : ColoredBox(
-                      color: scheme.surfaceContainerHighest,
-                      child: Icon(
-                        Icons.no_photography_outlined,
-                        color: scheme.onSurfaceVariant,
-                      ),
-                    ),
-            ),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  record.packageName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTextStyles.h4,
+    return AppListRow(
+      leading: ClipRRect(
+        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+        child: SizedBox(
+          width: 52,
+          height: 52,
+          child: hasPhoto
+              ? Image.file(File(photo), fit: BoxFit.cover)
+              : ColoredBox(
+                  color: c.surfaceAlt,
+                  child: Icon(
+                    Icons.no_photography_outlined,
+                    color: c.textSecondary,
+                  ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  when,
-                  style: AppTextStyles.bodySmall
-                      .copyWith(color: scheme.onSurfaceVariant),
-                ),
-              ],
-            ),
-          ),
-          IconButton(
-            onPressed: onDelete,
-            icon: const Icon(Icons.close),
-          ),
-        ],
+        ),
+      ),
+      title: record.packageName,
+      subtitle: when,
+      trailing: IconButton(
+        tooltip: 'Delete',
+        onPressed: onDelete,
+        icon: const Icon(Icons.close_rounded),
       ),
     );
   }

@@ -3,6 +3,7 @@ import 'package:core_ui/core_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:openlock/src/core/widgets/screen_header.dart';
 import 'package:openlock/src/features/apps/providers/apps_providers.dart';
 import 'package:openlock/src/features/enforcement/models/lock_config.dart';
 import 'package:openlock/src/features/enforcement/providers/config_providers.dart';
@@ -113,31 +114,25 @@ class _ScheduleEditorScreenState extends ConsumerState<ScheduleEditorScreen> {
         ],
       ),
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(AppSpacing.lg),
+        child: PageList(
           children: [
-            VaultTextField(label: 'Name', controller: _nameController),
-            const SizedBox(height: AppSpacing.lg),
-            const Text('Active days', style: AppTextStyles.label),
-            const SizedBox(height: AppSpacing.sm),
+            AppTextField(label: 'Name', controller: _nameController),
+            const _FieldLabel('Active days'),
             Wrap(
               spacing: AppSpacing.sm,
+              runSpacing: AppSpacing.sm,
               children: [
                 for (var day = 1; day <= 7; day++)
-                  FilterChip(
-                    label: Text(ScheduleFormat.weekdayLabels[day - 1]),
+                  AppChip(
+                    label: ScheduleFormat.weekdayLabels[day - 1],
                     selected: _weekdays.contains(day),
-                    onSelected: (selected) => setState(() {
-                      if (selected) {
-                        _weekdays.add(day);
-                      } else {
-                        _weekdays.remove(day);
-                      }
+                    onTap: () => setState(() {
+                      if (!_weekdays.add(day)) _weekdays.remove(day);
                     }),
                   ),
               ],
             ),
-            const SizedBox(height: AppSpacing.lg),
+            const _FieldLabel('Hours'),
             Row(
               children: [
                 Expanded(
@@ -147,7 +142,7 @@ class _ScheduleEditorScreenState extends ConsumerState<ScheduleEditorScreen> {
                     onTap: () => _pickTime(true),
                   ),
                 ),
-                const SizedBox(width: AppSpacing.md),
+                const SizedBox(width: AppSpacing.smd),
                 Expanded(
                   child: _TimeField(
                     label: 'End',
@@ -163,35 +158,38 @@ class _ScheduleEditorScreenState extends ConsumerState<ScheduleEditorScreen> {
                 child: Text(
                   'Overnight window — ends the next morning.',
                   style: AppTextStyles.caption.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    color: SuiteColors.of(context).textSecondary,
                   ),
                 ),
               ),
-            const SizedBox(height: AppSpacing.lg),
-            const Text('Apps to lock', style: AppTextStyles.label),
-            const SizedBox(height: AppSpacing.sm),
+            _FieldLabel(
+              'Apps to lock',
+              trailing: '${_packages.length} selected',
+            ),
             appsAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (_, __) => const Text('Could not load apps.'),
+              error: (_, __) => const AppEmptyState(
+                compact: true,
+                icon: Icons.error_outline_rounded,
+                title: 'Could not load apps',
+              ),
               data: (apps) {
                 final sorted = [...apps]..sort((a, b) =>
                     a.label.toLowerCase().compareTo(b.label.toLowerCase()));
-                return Column(
+                void toggle(String pkg) => setState(() {
+                      if (!_packages.add(pkg)) _packages.remove(pkg);
+                    });
+                return RowGroup(
+                  separatorIndent: AppSpacing.md,
                   children: [
                     for (final app in sorted)
-                      CheckboxListTile(
-                        value: _packages.contains(app.packageName),
-                        onChanged: (checked) => setState(() {
-                          if (checked ?? false) {
-                            _packages.add(app.packageName);
-                          } else {
-                            _packages.remove(app.packageName);
-                          }
-                        }),
-                        title: Text(
-                          app.label,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                      AppListRow(
+                        dense: true,
+                        title: app.label,
+                        onTap: () => toggle(app.packageName),
+                        trailing: Checkbox(
+                          value: _packages.contains(app.packageName),
+                          onChanged: (_) => toggle(app.packageName),
                         ),
                       ),
                   ],
@@ -202,6 +200,41 @@ class _ScheduleEditorScreenState extends ConsumerState<ScheduleEditorScreen> {
             VaultButton(label: 'Save schedule', onPressed: _save),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _FieldLabel extends StatelessWidget {
+  const _FieldLabel(this.text, {this.trailing});
+
+  final String text;
+  final String? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = SuiteColors.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.xs,
+        AppSpacing.lg,
+        AppSpacing.xs,
+        AppSpacing.sm,
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              text,
+              style: AppTextStyles.labelStrong.copyWith(color: c.textPrimary),
+            ),
+          ),
+          if (trailing != null)
+            Text(
+              trailing!,
+              style: AppTextStyles.label.copyWith(color: c.textSecondary),
+            ),
+        ],
       ),
     );
   }
@@ -220,19 +253,32 @@ class _TimeField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: AppTextStyles.label),
-        const SizedBox(height: AppSpacing.sm),
-        OutlinedButton(
-          onPressed: onTap,
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: Text(value, style: AppTextStyles.body),
+    final c = SuiteColors.of(context);
+    return Semantics(
+      button: true,
+      label: '$label time, $value',
+      child: ExcludeSemantics(
+        child: VaultCard(
+          onTap: onTap,
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: AppTextStyles.label.copyWith(color: c.textSecondary),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                value,
+                style: AppTextStyles.numberMedium.copyWith(
+                  color: c.textPrimary,
+                ),
+              ),
+            ],
           ),
         ),
-      ],
+      ),
     );
   }
 }

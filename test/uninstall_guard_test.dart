@@ -30,9 +30,14 @@ void main() {
 
   group('with protection on', () {
     test('guards the package installer (uninstall dialog)', () {
-      expect(guard(preventUninstall: true, package: 'com.android.packageinstaller'), isTrue);
       expect(
-        guard(preventUninstall: true, package: 'com.google.android.packageinstaller'),
+          guard(
+              preventUninstall: true, package: 'com.android.packageinstaller'),
+          isTrue);
+      expect(
+        guard(
+            preventUninstall: true,
+            package: 'com.google.android.packageinstaller'),
         isTrue,
       );
       expect(

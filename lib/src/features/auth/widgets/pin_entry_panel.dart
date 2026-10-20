@@ -33,7 +33,8 @@ class PinEntryPanelState extends State<PinEntryPanel>
   );
 
   List<String> _buildDigits() {
-    final digits = List<String>.generate(10, (i) => i.toString());
+    // Phone-keypad order: 1-9 across three rows, 0 beside the check key.
+    final digits = [for (var i = 1; i <= 10; i++) (i % 10).toString()];
     if (widget.randomize) digits.shuffle(math.Random.secure());
     return digits;
   }
@@ -78,51 +79,53 @@ class PinEntryPanelState extends State<PinEntryPanel>
   Widget build(BuildContext context) {
     final canSubmit =
         widget.enabled && _pin.length >= PinAuthService.minPinLength;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        AnimatedBuilder(
-          animation: _shakeController,
-          builder: (context, child) {
-            final t = _shakeController.value;
-            final dx = math.sin(t * math.pi * 6) * (1 - t) * 8;
-            return Transform.translate(offset: Offset(dx, 0), child: child);
-          },
-          child: _PinDots(count: _pin.length),
-        ),
-        const SizedBox(height: AppSpacing.xl),
-        for (var row = 0; row < 3; row++)
-          _keyRow([
-            for (var col = 0; col < 3; col++)
+    return ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 340),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AnimatedBuilder(
+              animation: _shakeController,
+              builder: (context, child) {
+                final t = _shakeController.value;
+                final dx = math.sin(t * math.pi * 6) * (1 - t) * 8;
+                return Transform.translate(offset: Offset(dx, 0), child: child);
+              },
+              child: _PinDots(count: _pin.length),
+            ),
+            const SizedBox(height: AppSpacing.xl),
+            for (var row = 0; row < 3; row++)
+              _keyRow([
+                for (var col = 0; col < 3; col++)
+                  _Key(
+                    label: _digits[row * 3 + col],
+                    onTap: widget.enabled
+                        ? () => _append(_digits[row * 3 + col])
+                        : null,
+                  ),
+              ]),
+            _keyRow([
               _Key(
-                label: _digits[row * 3 + col],
-                onTap: widget.enabled
-                    ? () => _append(_digits[row * 3 + col])
-                    : null,
+                icon: Icons.backspace_outlined,
+                onTap: widget.enabled && _pin.isNotEmpty ? _backspace : null,
               ),
-          ]),
-        _keyRow([
-          _Key(
-            icon: Icons.backspace_outlined,
-            onTap: widget.enabled && _pin.isNotEmpty ? _backspace : null,
-          ),
-          _Key(
-            label: _digits[9],
-            onTap: widget.enabled ? () => _append(_digits[9]) : null,
-          ),
-          _Key(
-            icon: Icons.check_rounded,
-            emphasized: true,
-            onTap: canSubmit ? _submit : null,
-          ),
-        ]),
-      ],
-    );
+              _Key(
+                label: _digits[9],
+                onTap: widget.enabled ? () => _append(_digits[9]) : null,
+              ),
+              _Key(
+                icon: Icons.check_rounded,
+                emphasized: true,
+                onTap: canSubmit ? _submit : null,
+              ),
+            ]),
+          ],
+        ));
   }
 
   Widget _keyRow(List<Widget> keys) => Padding(
-        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: keys),
+        padding: const EdgeInsets.only(bottom: AppSpacing.smd),
+        child: Row(children: [for (final k in keys) Expanded(child: k)]),
       );
 }
 
@@ -133,23 +136,32 @@ class _PinDots extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final c = SuiteColors.of(context);
     final shown = count == 0 ? PinAuthService.minPinLength : count;
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        for (var i = 0; i < shown; i++)
-          Container(
-            width: 14,
-            height: 14,
-            margin: const EdgeInsets.symmetric(horizontal: 6),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: i < count ? scheme.primary : Colors.transparent,
-              border: Border.all(color: scheme.outline, width: 1.5),
-            ),
-          ),
-      ],
+    return Semantics(
+      label: '$count digits entered',
+      child: ExcludeSemantics(
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            for (var i = 0; i < shown; i++)
+              AnimatedContainer(
+                duration: AppMotion.fast,
+                width: 14,
+                height: 14,
+                margin: const EdgeInsets.symmetric(horizontal: 6),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: i < count ? c.accent : Colors.transparent,
+                  border: Border.all(
+                    color: i < count ? c.accent : c.textTertiary,
+                    width: 1.5,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -164,28 +176,38 @@ class _Key extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final c = SuiteColors.of(context);
     final disabled = onTap == null;
-    final color = disabled
-        ? scheme.onSurface.withValues(alpha: 0.25)
-        : emphasized
-            ? scheme.primary
-            : scheme.onSurface;
+    final fg = emphasized
+        ? c.onAccent
+        : disabled
+            ? c.textTertiary.withValues(alpha: 0.5)
+            : c.textPrimary;
+    final bg = emphasized
+        ? (disabled ? c.accent.withValues(alpha: 0.35) : c.accent)
+        : (icon != null ? Colors.transparent : c.surface);
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+      padding: const EdgeInsets.symmetric(horizontal: 6),
       child: Material(
-        color: Colors.transparent,
-        shape: const CircleBorder(),
+        color: bg,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+          side: BorderSide(
+            color: emphasized || icon != null ? Colors.transparent : c.hairline,
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
-          customBorder: const CircleBorder(),
           child: SizedBox(
-            width: 72,
             height: 64,
             child: Center(
               child: label != null
-                  ? Text(label!, style: AppTextStyles.h2.copyWith(color: color))
-                  : Icon(icon, color: color, size: 26),
+                  ? Text(
+                      label!,
+                      style: AppTextStyles.numberLarge.copyWith(color: fg),
+                    )
+                  : Icon(icon, color: fg, size: 26),
             ),
           ),
         ),

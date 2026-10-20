@@ -32,11 +32,13 @@ void main() {
 
   test('build reflects the live device-admin state', () async {
     bridge.deviceAdminActive = true;
-    final active = await container.read(preventUninstallControllerProvider.future);
+    final active =
+        await container.read(preventUninstallControllerProvider.future);
     expect(active, isTrue);
   });
 
-  test('requestEnable requests device admin and marks the config flag', () async {
+  test('requestEnable requests device admin and marks the config flag',
+      () async {
     await container.read(configControllerProvider.future);
     await container.read(preventUninstallControllerProvider.future);
 
@@ -80,7 +82,8 @@ void main() {
 
     expect(lifted, isTrue);
     expect(bridge.deviceAdminDeactivated, isTrue);
-    expect(container.read(preventUninstallControllerProvider).valueOrNull, isFalse);
+    expect(container.read(preventUninstallControllerProvider).valueOrNull,
+        isFalse);
     expect(
       container.read(configControllerProvider).valueOrNull!.preventUninstall,
       isFalse,
