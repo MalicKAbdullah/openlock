@@ -2,7 +2,6 @@ import 'package:core_theme/core_theme.dart';
 import 'package:core_ui/core_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:openlock/src/core/router/app_router.dart';
 import 'package:openlock/src/features/auth/providers/auth_providers.dart';
 import 'package:openlock/src/features/auth/services/pin_auth_service.dart';
@@ -87,8 +86,9 @@ class _SetupPinScreenState extends ConsumerState<SetupPinScreen> {
       _saving = true;
       _error = null;
     });
-    await ref.read(sessionProvider.notifier).completeSetup(pin);
-    if (mounted) context.go(AppRoutes.permissions);
+    await ref
+        .read(sessionProvider.notifier)
+        .completeSetup(pin, then: AppRoutes.permissions);
   }
 
   @override

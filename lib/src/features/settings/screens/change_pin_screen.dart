@@ -3,9 +3,11 @@ import 'package:core_ui/core_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:openlock/src/core/di.dart';
+import 'package:openlock/src/features/auth/providers/auth_providers.dart';
 import 'package:openlock/src/features/auth/services/pin_auth_service.dart';
-import 'package:openlock/src/features/enforcement/providers/config_providers.dart';
+
+/// Changes the app PIN. In a session opened with a fingerprint, a fresh
+/// fingerprint replaces the current PIN as proof.
 
 class ChangePinScreen extends ConsumerStatefulWidget {
   const ChangePinScreen({super.key});
@@ -18,6 +20,8 @@ class _ChangePinScreenState extends ConsumerState<ChangePinScreen> {
   final _oldController = TextEditingController();
   final _newController = TextEditingController();
   final _confirmController = TextEditingController();
+  late final bool _withBiometric =
+      ref.read(sessionProvider.notifier).canChangePinWithBiometric;
   bool _saving = false;
   String? _error;
 
@@ -43,16 +47,14 @@ class _ChangePinScreenState extends ConsumerState<ChangePinScreen> {
       _saving = true;
       _error = null;
     });
-    final result = await ref.read(pinAuthServiceProvider).changePin(
-          oldPin: _oldController.text,
+    final result = await ref.read(sessionProvider.notifier).changePin(
+          oldPin: _withBiometric ? null : _oldController.text,
           newPin: newPin,
         );
     if (!mounted) return;
     setState(() => _saving = false);
     switch (result) {
       case UnlockSuccess():
-        // Push the new verifier hash down to the native enforcement layer.
-        await ref.read(configControllerProvider.notifier).pushToNative();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('PIN changed')),
@@ -60,7 +62,11 @@ class _ChangePinScreenState extends ConsumerState<ChangePinScreen> {
           context.pop();
         }
       case UnlockWrongPin():
-        setState(() => _error = 'Current PIN is incorrect');
+        setState(
+          () => _error = _withBiometric
+              ? 'Fingerprint not confirmed'
+              : 'Current PIN is incorrect',
+        );
       case UnlockCoolingDown(:final remaining):
         setState(
           () => _error = 'Too many attempts. Wait ${remaining.inSeconds}s',
@@ -78,14 +84,20 @@ class _ChangePinScreenState extends ConsumerState<ChangePinScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              AppTextField(
-                label: 'Current PIN',
-                controller: _oldController,
-                obscureText: true,
-                monospace: true,
-                clearable: false,
-                keyboardType: TextInputType.number,
-              ),
+              if (_withBiometric)
+                const Text(
+                  "You'll confirm with your fingerprint when you save.",
+                  style: AppTextStyles.bodySmall,
+                )
+              else
+                AppTextField(
+                  label: 'Current PIN',
+                  controller: _oldController,
+                  obscureText: true,
+                  monospace: true,
+                  clearable: false,
+                  keyboardType: TextInputType.number,
+                ),
               const SizedBox(height: AppSpacing.md),
               AppTextField(
                 label: 'New PIN',

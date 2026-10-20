@@ -50,6 +50,7 @@ final pinAuthServiceProvider = Provider<PinAuthService>(
   (ref) => PinAuthService(
     storage: ref.watch(secureStorageProvider),
     hasher: ref.watch(pinHasherProvider),
+    keyDerivation: ref.watch(keyDerivationProvider),
     clock: ref.watch(clockProvider),
   ),
 );

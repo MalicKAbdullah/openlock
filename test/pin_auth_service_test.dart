@@ -15,6 +15,7 @@ void main() {
     service = PinAuthService(
       storage: storage,
       hasher: const PinHasher(),
+      keyDerivation: const FakeKeyDerivation(),
       clock: clock,
     );
   });

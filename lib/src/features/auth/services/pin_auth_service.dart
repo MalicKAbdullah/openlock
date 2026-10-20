@@ -1,8 +1,10 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:core_crypto/core_crypto.dart';
 import 'package:core_storage/core_storage.dart';
 import 'package:openlock/src/core/clock.dart';
+import 'package:openlock/src/core/interfaces/key_derivation.dart';
 import 'package:openlock/src/core/storage_keys.dart';
 import 'package:openlock/src/features/auth/services/pin_hasher.dart';
 
@@ -34,17 +36,23 @@ final class UnlockCoolingDown extends UnlockResult {
 /// change, and an escalating wrong-attempt cooldown. The same verifier hash it
 /// stores is pushed to the native layer so the on-top LockActivity checks the
 /// identical PIN.
+///
+/// A recovery key resets a forgotten PIN: only an Argon2id verifier of its
+/// canonical form is stored, and recovery attempts share the PIN cooldown.
 final class PinAuthService {
   PinAuthService({
     required ISecureStorage storage,
     required PinHasher hasher,
+    required IKeyDerivation keyDerivation,
     required Clock clock,
   })  : _storage = storage,
         _hasher = hasher,
+        _kdf = keyDerivation,
         _clock = clock;
 
   final ISecureStorage _storage;
   final PinHasher _hasher;
+  final IKeyDerivation _kdf;
   final Clock _clock;
 
   static const int minPinLength = 6;
@@ -76,16 +84,70 @@ final class PinAuthService {
 
   /// Attempts to unlock with [pin], enforcing the escalating cooldown.
   Future<UnlockResult> unlock(String pin) async {
+    final v = await verifier();
+    if (v == null) throw StateError('No PIN configured');
+    final salt = Uint8List.fromList(base64Decode(v.salt));
+    return _attempt(
+      () => _hasher.verify(pin: pin, salt: salt, expectedHash: v.hash),
+    );
+  }
+
+  Future<bool> hasRecoveryKey() async =>
+      await _storage.read(key: OpenLockKeys.recoveryVerifier) != null;
+
+  /// Creates a recovery key, replacing any earlier one (which stops working),
+  /// and returns it in display form. It is never stored — show it now.
+  Future<String> createRecoveryKey() async {
+    final key = RecoveryKey.generate();
+    final salt = _hasher.newSalt();
+    final hash = await _kdf.deriveKey(
+      passphrase: RecoveryKey.normalize(key)!,
+      salt: salt,
+    );
+    await _storage.write(
+      key: OpenLockKeys.recoveryVerifier,
+      value: '${base64Encode(salt)}:${base64Encode(hash)}',
+    );
+    return key;
+  }
+
+  /// Whether existing users should get the one-time recovery-key offer: no
+  /// key yet and never offered.
+  Future<bool> recoveryOfferDue() async =>
+      !await hasRecoveryKey() &&
+      await _storage.read(key: OpenLockKeys.recoveryOffered) != 'true';
+
+  Future<void> markRecoveryOffered() =>
+      _storage.write(key: OpenLockKeys.recoveryOffered, value: 'true');
+
+  /// Forgotten PIN: when [recoveryKey] matches, stores [newPin] (fresh salt
+  /// and hash; push the config to native afterwards). Shares the cooldown.
+  Future<UnlockResult> resetWithRecoveryKey({
+    required String recoveryKey,
+    required String newPin,
+  }) async {
+    assert(newPin.length >= minPinLength, 'PIN must be at least 6 digits');
+    final result = await _attempt(() async {
+      final stored = await _storage.read(key: OpenLockKeys.recoveryVerifier);
+      final normalized = RecoveryKey.normalize(recoveryKey);
+      if (stored == null || normalized == null) return false;
+      final parts = stored.split(':');
+      final actual = await _kdf.deriveKey(
+        passphrase: normalized,
+        salt: Uint8List.fromList(base64Decode(parts[0])),
+      );
+      return _constantTimeEquals(actual, base64Decode(parts[1]));
+    });
+    if (result is UnlockSuccess) await setupPin(newPin);
+    return result;
+  }
+
+  Future<UnlockResult> _attempt(Future<bool> Function() check) async {
     final remaining = await cooldownRemaining();
     if (remaining > Duration.zero) {
       return UnlockCoolingDown(remaining: remaining);
     }
-
-    final v = await verifier();
-    if (v == null) throw StateError('No PIN configured');
-    final salt = Uint8List.fromList(base64Decode(v.salt));
-
-    if (await _hasher.verify(pin: pin, salt: salt, expectedHash: v.hash)) {
+    if (await check()) {
       await _resetAttempts();
       return const UnlockSuccess();
     }
@@ -155,6 +217,15 @@ final class PinAuthService {
     for (final key in OpenLockKeys.all) {
       await _storage.delete(key: key);
     }
+  }
+
+  static bool _constantTimeEquals(List<int> a, List<int> b) {
+    if (a.length != b.length) return false;
+    var diff = 0;
+    for (var i = 0; i < a.length; i++) {
+      diff |= a[i] ^ b[i];
+    }
+    return diff == 0;
   }
 
   Future<int> _failedAttempts() async {

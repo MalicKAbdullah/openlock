@@ -1,3 +1,4 @@
+import 'package:core_lock/core_lock.dart' show RecoveryKeyView;
 import 'package:core_theme/core_theme.dart';
 import 'package:core_ui/core_ui.dart';
 import 'package:flutter/material.dart';
@@ -55,16 +56,67 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
   /// In-app re-auth required before device admin can be deactivated. Tries
   /// biometrics first (if enabled), then falls back to a PIN prompt. Returns
   /// true only on a successful check.
-  Future<bool> _authenticateForDisable() async {
+  Future<bool> _authenticateForDisable() =>
+      _reauthenticate('Enter your PIN to turn off uninstall protection.');
+
+  /// Re-auth, confirm replacing any existing key, then show a new recovery
+  /// key until the user confirms saving it.
+  Future<void> _recoveryKey() async {
+    if (!await _reauthenticate('Enter your PIN to create a recovery key.')) {
+      return;
+    }
+    final auth = ref.read(pinAuthServiceProvider);
+    if (await auth.hasRecoveryKey() && mounted) {
+      final replace = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Replace your recovery key?'),
+          content: const Text(
+            'Your current recovery key will stop working. Recovery keys are '
+            'never stored, so the current one cannot be shown again.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Create new key'),
+            ),
+          ],
+        ),
+      );
+      if (replace != true) return;
+    }
+    final key = await auth.createRecoveryKey();
+    await auth.markRecoveryOffered();
+    if (!mounted) return;
+    await Navigator.of(context, rootNavigator: true).push<void>(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (routeContext) => PopScope(
+          canPop: false,
+          child: RecoveryKeyView(
+            recoveryKey: key,
+            appName: 'OpenLock',
+            onDone: () => Navigator.pop(routeContext),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<bool> _reauthenticate(String pinPrompt) async {
     final biometric = ref.read(biometricServiceProvider);
     if (await biometric.isEnabled() && await biometric.authenticate()) {
       return true;
     }
     if (!mounted) return false;
-    return _promptPin();
+    return _promptPin(pinPrompt);
   }
 
-  Future<bool> _promptPin() async {
+  Future<bool> _promptPin(String prompt) async {
     final controller = TextEditingController();
     final confirmed = await showDialog<bool>(
       context: context,
@@ -76,9 +128,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
-                  'Enter your PIN to turn off uninstall protection.',
-                ),
+                Text(prompt),
                 const SizedBox(height: AppSpacing.md),
                 AppTextField(
                   controller: controller,
@@ -177,6 +227,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                   icon: Icons.pin_outlined,
                   title: 'Change PIN',
                   onTap: () => context.push(AppRoutes.changePin),
+                ),
+                SettingsTile(
+                  icon: Icons.key_outlined,
+                  title: 'Recovery key',
+                  subtitle: 'Resets your PIN if you forget it',
+                  onTap: _recoveryKey,
                 ),
                 toggle(
                   icon: Icons.fingerprint,
