@@ -1,7 +1,7 @@
 name: openlock
 description: OpenLock — an offline, open-source app lock that guards your apps behind a PIN, pattern, or fingerprint, with device-admin uninstall protection.
 publish_to: none
-version: 1.6.0+8
+version: 1.7.0+9
 
 environment:
   sdk: '>=3.3.0 <4.0.0'
