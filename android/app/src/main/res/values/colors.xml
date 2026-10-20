@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- OpenLock brand — amber guard on near-black, used by the native
+    <!-- OpenLock brand — cyan guard on graphite, used by the native
          LockActivity and monitor notification. -->
-    <color name="lockBackground">#FF0B0B0D</color>
-    <color name="lockSurface">#FF18181B</color>
-    <color name="lockAccent">#FFFBBF24</color>
-    <color name="lockOnAccent">#FF451A03</color>
-    <color name="lockTextPrimary">#FFFAFAFA</color>
-    <color name="lockTextSecondary">#FFA1A1AA</color>
-    <color name="lockError">#FFF87171</color>
-	<color name="ic_launcher_background">#D97706</color>
+    <color name="lockBackground">#FF0A0C10</color>
+    <color name="lockSurface">#FF12151A</color>
+    <color name="lockAccent">#FF3FD0EE</color>
+    <color name="lockOnAccent">#FF0A0C10</color>
+    <color name="lockTextPrimary">#FFEDEFF3</color>
+    <color name="lockTextSecondary">#FF9BA3B1</color>
+    <color name="lockError">#FFFF6B70</color>
+    <color name="ic_launcher_background">#007E9C</color>
 </resources>
