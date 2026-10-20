@@ -31,6 +31,27 @@ import '../helpers/fakes.dart';
 /// review only; it asserts nothing.
 final String? _gallery = Platform.environment['GALLERY'];
 
+/// A 96px launcher-style icon (colored squircle with a white disc), matching
+/// the PNGs the native side sends, so previews show what real icons look like.
+Future<Uint8List> _fakeIcon(Color color) async {
+  const size = 96.0;
+  final recorder = ui.PictureRecorder();
+  final canvas = Canvas(recorder);
+  canvas
+    ..drawRRect(
+      RRect.fromRectXY(const Rect.fromLTWH(0, 0, size, size), 22, 22),
+      Paint()..color = color,
+    )
+    ..drawCircle(
+      const Offset(size / 2, size / 2),
+      22,
+      Paint()..color = const Color(0xE6FFFFFF),
+    );
+  final image = await recorder.endRecording().toImage(96, 96);
+  final data = await image.toByteData(format: ui.ImageByteFormat.png);
+  return data!.buffer.asUint8List();
+}
+
 Future<void> _loadFonts() async {
   Future<void> family(String name, List<String> files) async {
     final loader = FontLoader(name);
@@ -74,15 +95,27 @@ void main() {
     if (_gallery == null) return;
     await tester.runAsync(_loadFonts);
 
+    final icons = await tester.runAsync(() async => {
+          'com.instagram.android': await _fakeIcon(const Color(0xFFD62976)),
+          'com.whatsapp': await _fakeIcon(const Color(0xFF25D366)),
+          'com.google.android.gm': await _fakeIcon(const Color(0xFFEA4335)),
+          'com.netflix.mediaclient': await _fakeIcon(const Color(0xFF141414)),
+          'org.telegram.messenger': await _fakeIcon(const Color(0xFF2AABEE)),
+          'com.spotify.music': await _fakeIcon(const Color(0xFF1DB954)),
+          'com.android.chrome': await _fakeIcon(const Color(0xFF4285F4)),
+        });
+    InstalledApp app(String pkg, String label) =>
+        InstalledApp(packageName: pkg, label: label, icon: icons![pkg]);
+
     final bridge = FakeEnforcementBridge(
-      apps: const [
-        InstalledApp(packageName: 'com.instagram.android', label: 'Instagram'),
-        InstalledApp(packageName: 'com.whatsapp', label: 'WhatsApp'),
-        InstalledApp(packageName: 'com.google.android.gm', label: 'Gmail'),
-        InstalledApp(packageName: 'com.netflix.mediaclient', label: 'Netflix'),
-        InstalledApp(packageName: 'org.telegram.messenger', label: 'Telegram'),
-        InstalledApp(packageName: 'com.spotify.music', label: 'Spotify'),
-        InstalledApp(packageName: 'com.android.chrome', label: 'Chrome'),
+      apps: [
+        app('com.instagram.android', 'Instagram'),
+        app('com.whatsapp', 'WhatsApp'),
+        app('com.google.android.gm', 'Gmail'),
+        app('com.netflix.mediaclient', 'Netflix'),
+        app('org.telegram.messenger', 'Telegram'),
+        app('com.spotify.music', 'Spotify'),
+        app('com.android.chrome', 'Chrome'),
       ],
       permissions: const PermissionStates(
         usageAccess: true,
