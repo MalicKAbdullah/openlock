@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openlock/src/core/di.dart';
 import 'package:openlock/src/core/interfaces/enforcement_bridge.dart';
-import 'package:openlock/src/core/theme.dart';
 import 'package:openlock/src/features/onboarding/screens/onboarding_screen.dart';
 import 'package:openlock/src/features/onboarding/screens/permissions_screen.dart';
 
@@ -14,7 +13,7 @@ Widget _wrap(Widget child, {List<Override> overrides = const []}) {
   return ProviderScope(
     overrides: overrides,
     child: MaterialApp(
-      theme: AppTheme.build(Brightness.light, accent: openlockAccent),
+      theme: AppTheme.build(Brightness.light, accent: AppAccents.openlock),
       home: child,
     ),
   );

@@ -30,19 +30,34 @@ class _SetupPinScreenState extends ConsumerState<SetupPinScreen> {
     super.dispose();
   }
 
-  ({String label, double value, Color color}) _strength(String pin) {
+  ({String label, double value, Color color}) _strength(
+    BuildContext context,
+    String pin,
+  ) {
     if (pin.length < PinAuthService.minPinLength) {
-      return (label: 'Too short', value: 0.2, color: AppColors.errorLight);
+      return (
+        label: 'Too short',
+        value: 0.2,
+        color: SuiteColors.of(context).negative
+      );
     }
     final unique = pin.split('').toSet().length;
     final sequential = _isSequential(pin);
     if (pin.length >= 8 && unique >= 5 && !sequential) {
-      return (label: 'Strong', value: 1, color: AppColors.successLight);
+      return (
+        label: 'Strong',
+        value: 1,
+        color: SuiteColors.of(context).positive
+      );
     }
     if (pin.length >= 6 && unique >= 3 && !sequential) {
-      return (label: 'Good', value: 0.66, color: AppColors.warningLight);
+      return (
+        label: 'Good',
+        value: 0.66,
+        color: SuiteColors.of(context).warning
+      );
     }
-    return (label: 'Weak', value: 0.4, color: AppColors.errorLight);
+    return (label: 'Weak', value: 0.4, color: SuiteColors.of(context).negative);
   }
 
   bool _isSequential(String pin) {
@@ -79,12 +94,12 @@ class _SetupPinScreenState extends ConsumerState<SetupPinScreen> {
   @override
   Widget build(BuildContext context) {
     final pin = _pinController.text;
-    final strength = _strength(pin);
+    final strength = _strength(context, pin);
     return Scaffold(
       appBar: AppBar(title: const Text('Create your PIN')),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(AppSpacing.lg),
+          padding: const EdgeInsets.all(AppSpacing.gutter),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -92,12 +107,14 @@ class _SetupPinScreenState extends ConsumerState<SetupPinScreen> {
                 'This PIN unlocks OpenLock and every app you lock. Choose '
                 'something only you know.',
                 style: AppTextStyles.bodyMedium.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  color: SuiteColors.of(context).textSecondary,
                 ),
               ),
               const SizedBox(height: AppSpacing.xl),
-              VaultTextField(
+              AppTextField(
                 label: 'PIN',
+                monospace: true,
+                clearable: false,
                 controller: _pinController,
                 obscureText: _obscure,
                 keyboardType: TextInputType.number,
@@ -111,19 +128,19 @@ class _SetupPinScreenState extends ConsumerState<SetupPinScreen> {
                 ),
               ),
               const SizedBox(height: AppSpacing.sm),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(99),
-                child: LinearProgressIndicator(
-                  value: strength.value,
-                  color: strength.color,
-                  minHeight: 6,
+              AppProgressBar(value: strength.value, color: strength.color),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                strength.label,
+                style: AppTextStyles.caption.copyWith(
+                  color: SuiteColors.of(context).textSecondary,
                 ),
               ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(strength.label, style: AppTextStyles.caption),
-              const SizedBox(height: AppSpacing.lg),
-              VaultTextField(
+              const SizedBox(height: AppSpacing.md),
+              AppTextField(
                 label: 'Confirm PIN',
+                monospace: true,
+                clearable: false,
                 controller: _confirmController,
                 obscureText: _obscure,
                 keyboardType: TextInputType.number,

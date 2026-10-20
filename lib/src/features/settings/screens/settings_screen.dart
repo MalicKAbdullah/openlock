@@ -1,9 +1,11 @@
 import 'package:core_theme/core_theme.dart';
+import 'package:core_ui/core_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:openlock/src/core/di.dart';
 import 'package:openlock/src/core/router/app_router.dart';
+import 'package:openlock/src/core/widgets/screen_header.dart';
 import 'package:openlock/src/features/enforcement/models/lock_config.dart';
 import 'package:openlock/src/features/enforcement/models/relock_policy.dart';
 import 'package:openlock/src/features/enforcement/providers/config_providers.dart';
@@ -78,15 +80,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                   'Enter your PIN to turn off uninstall protection.',
                 ),
                 const SizedBox(height: AppSpacing.md),
-                TextField(
+                AppTextField(
                   controller: controller,
+                  label: 'PIN',
                   obscureText: true,
                   autofocus: true,
                   keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    labelText: 'PIN',
-                    errorText: error ? 'Wrong PIN' : null,
-                  ),
+                  errorText: error ? 'Wrong PIN' : null,
                 ),
               ],
             ),
@@ -131,171 +131,176 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     final preventUninstall =
         ref.watch(preventUninstallControllerProvider).valueOrNull ?? false;
 
+    Widget toggle({
+      required IconData icon,
+      required String title,
+      required String subtitle,
+      required bool value,
+      required ValueChanged<bool>? onChanged,
+    }) =>
+        SettingsTile(
+          icon: icon,
+          title: title,
+          subtitle: subtitle,
+          showChevron: false,
+          trailing: Switch(value: value, onChanged: onChanged),
+          onTap: onChanged == null ? null : () => onChanged(!value),
+        );
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
       body: SafeArea(
-        child: ListView(
+        bottom: false,
+        child: PageList(
           children: [
-            _section(context, 'Protection'),
-            ListTile(
-              leading: const Icon(Icons.verified_user_outlined),
-              title: const Text('Permissions & status'),
-              subtitle: const Text('Usage access, overlay, monitor service'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => context.push(AppRoutes.permissions),
+            const ScreenHeader(eyebrow: 'OpenLock', title: 'Settings'),
+            const SectionLead('Protection'),
+            RowGroup(
+              children: [
+                SettingsTile(
+                  icon: Icons.verified_user_outlined,
+                  title: 'Permissions & status',
+                  subtitle: 'Usage access, overlay, monitor service',
+                  onTap: () => context.push(AppRoutes.permissions),
+                ),
+                SettingsTile(
+                  icon: Icons.timer_outlined,
+                  title: 'Relock behavior',
+                  subtitle: _relockLabel(config.relock),
+                  onTap: () => context.push(AppRoutes.relock),
+                ),
+              ],
             ),
-            ListTile(
-              leading: const Icon(Icons.timer_outlined),
-              title: const Text('Relock behavior'),
-              subtitle: Text(_relockLabel(config.relock)),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => context.push(AppRoutes.relock),
-            ),
-            _section(context, 'Security'),
-            ListTile(
-              leading: const Icon(Icons.pin_outlined),
-              title: const Text('Change PIN'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => context.push(AppRoutes.changePin),
-            ),
-            SwitchListTile(
-              secondary: const Icon(Icons.fingerprint),
-              title: const Text('Fingerprint unlock'),
-              subtitle: Text(
-                biometricSupported
-                    ? 'Use your fingerprint to open OpenLock'
-                    : 'Not available on this device',
-              ),
-              value: biometricEnabled,
-              onChanged: biometricSupported
-                  ? (value) async {
-                      final service = ref.read(biometricServiceProvider);
-                      if (value) {
-                        await service.enable();
-                      } else {
-                        await service.disable();
+            const SectionLead('Security'),
+            RowGroup(
+              children: [
+                SettingsTile(
+                  icon: Icons.pin_outlined,
+                  title: 'Change PIN',
+                  onTap: () => context.push(AppRoutes.changePin),
+                ),
+                toggle(
+                  icon: Icons.fingerprint,
+                  title: 'Fingerprint unlock',
+                  subtitle: biometricSupported
+                      ? 'Unlock with your fingerprint'
+                      : 'Not available on this device',
+                  value: biometricEnabled,
+                  onChanged: biometricSupported
+                      ? (value) async {
+                          final service = ref.read(biometricServiceProvider);
+                          if (value) {
+                            await service.enable();
+                          } else {
+                            await service.disable();
+                          }
+                          ref.invalidate(biometricEnabledProvider);
+                          // Keep the native lock screen in sync with the choice.
+                          await controller.pushToNative();
+                        }
+                      : null,
+                ),
+                toggle(
+                  icon: Icons.app_blocking_outlined,
+                  title: 'Prevent uninstall',
+                  subtitle: preventUninstall
+                      ? 'Uninstall needs your PIN'
+                      : 'Require your PIN to uninstall',
+                  value: preventUninstall,
+                  onChanged: (value) async {
+                    final security =
+                        ref.read(preventUninstallControllerProvider.notifier);
+                    if (value) {
+                      await security.requestEnable();
+                    } else {
+                      final messenger = ScaffoldMessenger.of(context);
+                      final lifted = await security
+                          .disableWithAuth(_authenticateForDisable);
+                      if (!lifted) {
+                        messenger.showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'PIN or fingerprint required to turn off '
+                              'uninstall protection.',
+                            ),
+                          ),
+                        );
                       }
-                      ref.invalidate(biometricEnabledProvider);
-                      // Keep the native lock screen in sync with the choice.
-                      await controller.pushToNative();
                     }
-                  : null,
+                  },
+                ),
+                toggle(
+                  icon: Icons.shuffle,
+                  title: 'Randomize keypad',
+                  subtitle: 'Shuffle digits on the keypad',
+                  value: config.randomizeKeypad,
+                  onChanged: controller.setRandomizeKeypad,
+                ),
+              ],
             ),
-            SwitchListTile(
-              secondary: const Icon(Icons.app_blocking_outlined),
-              title: const Text('Prevent uninstall'),
-              subtitle: Text(
-                preventUninstall
-                    ? 'OpenLock is a device admin — it can\'t be uninstalled '
-                        'until you turn this off with your PIN.'
-                    : 'Block OpenLock from being uninstalled without your PIN '
-                        '(uses device administrator).',
-              ),
-              value: preventUninstall,
-              onChanged: (value) async {
-                final security =
-                    ref.read(preventUninstallControllerProvider.notifier);
-                if (value) {
-                  await security.requestEnable();
-                } else {
-                  final messenger = ScaffoldMessenger.of(context);
-                  final lifted =
-                      await security.disableWithAuth(_authenticateForDisable);
-                  if (!lifted) {
-                    messenger.showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'PIN or fingerprint required to turn off uninstall '
-                          'protection.',
-                        ),
-                      ),
-                    );
-                  }
-                }
-              },
+            const SectionLead('Intruder detection'),
+            RowGroup(
+              children: [
+                toggle(
+                  icon: Icons.photo_camera_outlined,
+                  title: 'Capture intruder photos',
+                  subtitle:
+                      'Photo after ${config.intruderThreshold} failed attempts',
+                  value: config.intruderCaptureEnabled,
+                  onChanged: (value) =>
+                      controller.setIntruderCapture(enabled: value),
+                ),
+                SettingsTile(
+                  icon: Icons.list_alt_outlined,
+                  title: 'View intruder log',
+                  onTap: () => context.go(AppRoutes.intruder),
+                ),
+              ],
             ),
-            SwitchListTile(
-              secondary: const Icon(Icons.shuffle),
-              title: const Text('Randomize keypad'),
-              subtitle: const Text('Shuffle digits to foil shoulder-surfers'),
-              value: config.randomizeKeypad,
-              onChanged: controller.setRandomizeKeypad,
+            const SectionLead('Advanced'),
+            RowGroup(
+              children: [
+                toggle(
+                  icon: Icons.warning_amber_outlined,
+                  title: 'Decoy cover',
+                  subtitle: 'Fake "app stopped" dialog',
+                  value: config.fakeCoverEnabled,
+                  onChanged: controller.setFakeCover,
+                ),
+                SettingsTile(
+                  icon: Icons.backup_outlined,
+                  title: 'Backup & restore',
+                  onTap: () => context.push(AppRoutes.backup),
+                ),
+              ],
             ),
-            _section(context, 'Intruder detection'),
-            SwitchListTile(
-              secondary: const Icon(Icons.photo_camera_outlined),
-              title: const Text('Capture intruder photos'),
-              subtitle: Text(
-                'After ${config.intruderThreshold} failed attempts, take a '
-                'silent front-camera photo',
-              ),
-              value: config.intruderCaptureEnabled,
-              onChanged: (value) =>
-                  controller.setIntruderCapture(enabled: value),
+            const SectionLead('Updates'),
+            RowGroup(
+              children: [
+                const _UpdateTiles(),
+                SettingsTile(
+                  icon: Icons.info_outline,
+                  title: 'About',
+                  onTap: () => context.push(AppRoutes.about),
+                ),
+              ],
             ),
-            ListTile(
-              leading: const Icon(Icons.list_alt_outlined),
-              title: const Text('View intruder log'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => context.go(AppRoutes.intruder),
-            ),
-            _section(context, 'Advanced'),
-            SwitchListTile(
-              secondary: const Icon(Icons.warning_amber_outlined),
-              title: const Text('Decoy cover'),
-              subtitle: const Text(
-                'Show a fake "app has stopped" dialog; long-press to unlock',
-              ),
-              value: config.fakeCoverEnabled,
-              onChanged: controller.setFakeCover,
-            ),
-            ListTile(
-              leading: const Icon(Icons.backup_outlined),
-              title: const Text('Backup & restore'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => context.push(AppRoutes.backup),
-            ),
-            _section(context, 'Updates'),
-            const _UpdateSection(),
-            ListTile(
-              leading: const Icon(Icons.info_outline),
-              title: const Text('About'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => context.push(AppRoutes.about),
-            ),
-            const SizedBox(height: AppSpacing.xl),
           ],
         ),
       ),
     );
   }
-
-  Widget _section(BuildContext context, String title) => Padding(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.md,
-          AppSpacing.lg,
-          AppSpacing.md,
-          AppSpacing.sm,
-        ),
-        child: Text(
-          title.toUpperCase(),
-          style: AppTextStyles.overline.copyWith(
-            color: Theme.of(context).colorScheme.primary,
-          ),
-        ),
-      );
 }
 
 /// "Check for updates on open" toggle + a manual "Check now", backed by
 /// core_update. On by default; the only network call the app makes.
-class _UpdateSection extends ConsumerStatefulWidget {
-  const _UpdateSection();
+class _UpdateTiles extends ConsumerStatefulWidget {
+  const _UpdateTiles();
 
   @override
-  ConsumerState<_UpdateSection> createState() => _UpdateSectionState();
+  ConsumerState<_UpdateTiles> createState() => _UpdateTilesState();
 }
 
-class _UpdateSectionState extends ConsumerState<_UpdateSection> {
+class _UpdateTilesState extends ConsumerState<_UpdateTiles> {
   bool _checking = false;
 
   Future<void> _checkNow() async {
@@ -324,27 +329,30 @@ class _UpdateSectionState extends ConsumerState<_UpdateSection> {
   @override
   Widget build(BuildContext context) {
     final autoCheck = ref.watch(updateAutoCheckProvider).valueOrNull ?? true;
+    Future<void> setAuto(bool v) async {
+      await ref.read(secureStorageProvider).write(
+            key: updateAutoCheckKey,
+            value: v ? 'true' : 'false',
+          );
+      ref.invalidate(updateAutoCheckProvider);
+      ref.invalidate(updateCheckProvider);
+    }
+
     return Column(
       children: [
-        SwitchListTile(
-          secondary: const Icon(Icons.system_update_alt),
-          title: const Text('Check for updates on open'),
-          subtitle: const Text(
-            'Looks for a new release on GitHub. Nothing is uploaded.',
-          ),
-          value: autoCheck,
-          onChanged: (v) async {
-            await ref.read(secureStorageProvider).write(
-                  key: updateAutoCheckKey,
-                  value: v ? 'true' : 'false',
-                );
-            ref.invalidate(updateAutoCheckProvider);
-            ref.invalidate(updateCheckProvider);
-          },
+        SettingsTile(
+          icon: Icons.system_update_alt,
+          title: 'Auto-check for updates',
+          subtitle: 'Checks GitHub, uploads nothing',
+          showChevron: false,
+          trailing: Switch(value: autoCheck, onChanged: setAuto),
+          onTap: () => setAuto(!autoCheck),
         ),
-        ListTile(
-          leading: const Icon(Icons.refresh),
-          title: const Text('Check now'),
+        const Divider(height: 1, indent: 68),
+        SettingsTile(
+          icon: Icons.refresh,
+          title: 'Check now',
+          showChevron: false,
           trailing: _checking
               ? const SizedBox(
                   width: 18,

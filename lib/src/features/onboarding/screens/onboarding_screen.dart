@@ -1,4 +1,5 @@
 import 'package:core_theme/core_theme.dart';
+import 'package:core_ui/core_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:openlock/src/features/auth/providers/auth_providers.dart';
@@ -66,98 +67,126 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final c = SuiteColors.of(context);
     final isLast = _index == _pages.length - 1;
 
     return Scaffold(
       body: SafeArea(
-        child: Column(
-          children: [
-            Align(
-              alignment: Alignment.centerRight,
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.sm),
-                child: TextButton(
-                  onPressed: _finish,
-                  child: const Text('Skip'),
-                ),
-              ),
-            ),
-            Expanded(
-              child: PageView.builder(
-                controller: _controller,
-                itemCount: _pages.length,
-                onPageChanged: (index) => setState(() => _index = index),
-                itemBuilder: (context, index) {
-                  final page = _pages[index];
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.xl,
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(AppSpacing.lg),
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.primaryContainer,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            page.icon,
-                            size: 56,
-                            color: theme.colorScheme.onPrimaryContainer,
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.xl),
-                        Text(
-                          page.title,
-                          style: AppTextStyles.h2,
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-                        Text(
-                          page.message,
-                          style: theme.textTheme.bodyLarge!.copyWith(
-                            height: 1.5,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560),
+            child: Column(
               children: [
-                for (var i = 0; i < _pages.length; i++)
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    margin: const EdgeInsets.symmetric(horizontal: 4),
-                    width: i == _index ? 22 : 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: i == _index
-                          ? theme.colorScheme.primary
-                          : theme.colorScheme.outlineVariant,
-                      borderRadius: BorderRadius.circular(99),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppSpacing.sm),
+                    child: TextButton(
+                      onPressed: _finish,
+                      child: const Text('Skip'),
                     ),
                   ),
+                ),
+                Expanded(
+                  child: PageView.builder(
+                    controller: _controller,
+                    itemCount: _pages.length,
+                    onPageChanged: (index) => setState(() => _index = index),
+                    itemBuilder: (context, index) {
+                      final page = _pages[index];
+                      return SingleChildScrollView(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.gutter + AppSpacing.sm,
+                        ),
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            minHeight: MediaQuery.sizeOf(context).height * 0.5,
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (index == 0)
+                                const SuiteAppIcon(
+                                  app: SuiteApp.openlock,
+                                  size: 88,
+                                )
+                              else
+                                DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    color: c.accentContainer,
+                                    borderRadius: BorderRadius.circular(
+                                      AppSpacing.radiusXl,
+                                    ),
+                                  ),
+                                  child: SizedBox(
+                                    width: 88,
+                                    height: 88,
+                                    child: Icon(
+                                      page.icon,
+                                      size: 40,
+                                      color: c.accent,
+                                    ),
+                                  ),
+                                ),
+                              const SizedBox(height: AppSpacing.xl),
+                              Text(
+                                '${index + 1} of ${_pages.length}',
+                                style: AppTextStyles.overline.copyWith(
+                                  color: c.accent,
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.sm),
+                              Semantics(
+                                header: true,
+                                child: Text(
+                                  page.title,
+                                  style: AppTextStyles.display.copyWith(
+                                    color: c.textPrimary,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.md),
+                              Text(
+                                page.message,
+                                style: AppTextStyles.body.copyWith(
+                                  color: c.textSecondary,
+                                  height: 1.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    for (var i = 0; i < _pages.length; i++)
+                      AnimatedContainer(
+                        duration: AppMotion.fast,
+                        margin: const EdgeInsets.symmetric(horizontal: 4),
+                        width: i == _index ? 22 : 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: i == _index ? c.accent : c.border,
+                          borderRadius: BorderRadius.circular(99),
+                        ),
+                      ),
+                  ],
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(AppSpacing.gutter),
+                  child: VaultButton(
+                    label: isLast ? 'Set up my PIN' : 'Next',
+                    onPressed: _next,
+                  ),
+                ),
               ],
             ),
-            Padding(
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              child: SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: _next,
-                  child: Text(isLast ? 'Set up my PIN' : 'Next'),
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );

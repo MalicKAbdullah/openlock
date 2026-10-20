@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:openlock/src/core/interfaces/enforcement_bridge.dart';
 import 'package:openlock/src/core/router/app_router.dart';
+import 'package:openlock/src/core/widgets/screen_header.dart';
 import 'package:openlock/src/features/onboarding/providers/permissions_providers.dart';
 
 /// Guided permissions checklist. Each item shows its live status and a button
@@ -56,43 +57,48 @@ class _PermissionsScreenState extends ConsumerState<PermissionsScreen>
         ],
       ),
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(AppSpacing.lg),
+        child: PageList(
           children: [
             _StatusBanner(states: states),
-            const SizedBox(height: AppSpacing.lg),
-            _PermissionTile(
-              icon: Icons.query_stats_rounded,
-              title: 'Usage access',
-              subtitle:
-                  'Lets OpenLock notice which app is open so it can lock it.',
-              granted: states.usageAccess,
-              required: true,
-              onFix: controller.requestUsageAccess,
-            ),
-            _PermissionTile(
-              icon: Icons.layers_rounded,
-              title: 'Display over other apps',
-              subtitle: 'Lets the lock screen appear on top of a locked app.',
-              granted: states.overlay,
-              required: true,
-              onFix: controller.requestOverlay,
-            ),
-            _PermissionTile(
-              icon: Icons.battery_saver_rounded,
-              title: 'Ignore battery optimization',
-              subtitle: 'Keeps the guard running reliably in the background.',
-              granted: states.batteryExempt,
-              required: false,
-              onFix: controller.requestBattery,
-            ),
-            _PermissionTile(
-              icon: Icons.notifications_rounded,
-              title: 'Notifications',
-              subtitle: 'Shows the ongoing "protection active" notice.',
-              granted: states.notifications,
-              required: false,
-              onFix: controller.requestNotifications,
+            const SizedBox(height: AppSpacing.md),
+            RowGroup(
+              children: [
+                _PermissionTile(
+                  icon: Icons.query_stats_rounded,
+                  title: 'Usage access',
+                  subtitle:
+                      'Lets OpenLock notice which app is open so it can lock it.',
+                  granted: states.usageAccess,
+                  required: true,
+                  onFix: controller.requestUsageAccess,
+                ),
+                _PermissionTile(
+                  icon: Icons.layers_rounded,
+                  title: 'Display over other apps',
+                  subtitle:
+                      'Lets the lock screen appear on top of a locked app.',
+                  granted: states.overlay,
+                  required: true,
+                  onFix: controller.requestOverlay,
+                ),
+                _PermissionTile(
+                  icon: Icons.battery_saver_rounded,
+                  title: 'Ignore battery optimization',
+                  subtitle:
+                      'Keeps the guard running reliably in the background.',
+                  granted: states.batteryExempt,
+                  required: false,
+                  onFix: controller.requestBattery,
+                ),
+                _PermissionTile(
+                  icon: Icons.notifications_rounded,
+                  title: 'Notifications',
+                  subtitle: 'Shows the ongoing "protection active" notice.',
+                  granted: states.notifications,
+                  required: false,
+                  onFix: controller.requestNotifications,
+                ),
+              ],
             ),
             const SizedBox(height: AppSpacing.lg),
             if (states.canEnforce && !states.serviceRunning)
@@ -126,39 +132,13 @@ class _StatusBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final active = states.protectionActive;
-    final scheme = Theme.of(context).colorScheme;
-    final color = active ? AppColors.successLight : AppColors.warningLight;
-    return VaultCard(
-      child: Row(
-        children: [
-          Icon(
-            active ? Icons.verified_user_rounded : Icons.gpp_maybe_rounded,
-            color: color,
-            size: 32,
-          ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  active ? 'Protection active' : 'Protection not active yet',
-                  style: AppTextStyles.h4,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  active
-                      ? 'OpenLock is guarding your locked apps.'
-                      : 'Grant the required permissions below to start.',
-                  style: AppTextStyles.bodySmall.copyWith(
-                    color: scheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+    return AppBanner(
+      kind: active ? BannerKind.success : BannerKind.warning,
+      icon: active ? Icons.verified_user_rounded : Icons.gpp_maybe_rounded,
+      title: active ? 'Protection active' : 'Protection not active yet',
+      message: active
+          ? 'OpenLock is guarding your locked apps.'
+          : 'Grant the required permissions below to start.',
     );
   }
 }
@@ -182,50 +162,14 @@ class _PermissionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-      child: VaultCard(
-        child: Row(
-          children: [
-            Icon(icon, color: scheme.primary),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Flexible(child: Text(title, style: AppTextStyles.h4)),
-                      if (required) ...[
-                        const SizedBox(width: AppSpacing.xs),
-                        Text(
-                          'Required',
-                          style: AppTextStyles.overline.copyWith(
-                            color: scheme.primary,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: AppTextStyles.bodySmall.copyWith(
-                      color: scheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            if (granted)
-              const Icon(Icons.check_circle, color: AppColors.successLight)
-            else
-              TextButton(onPressed: onFix, child: const Text('Grant')),
-          ],
-        ),
-      ),
+    final c = SuiteColors.of(context);
+    return DetailRow(
+      leading: IconBadge(icon: icon, color: granted ? c.positive : null),
+      title: title,
+      detail: required ? 'Required. $subtitle' : subtitle,
+      trailing: granted
+          ? Icon(Icons.check_circle_rounded, color: c.positive)
+          : TextButton(onPressed: onFix, child: const Text('Grant')),
     );
   }
 }

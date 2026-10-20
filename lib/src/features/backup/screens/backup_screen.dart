@@ -94,12 +94,12 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final c = SuiteColors.of(context);
     return Scaffold(
       appBar: AppBar(title: const Text('Backup & restore')),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(AppSpacing.lg),
+          padding: const EdgeInsets.all(AppSpacing.gutter),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -107,16 +107,16 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
                 'Your backup is encrypted with a passphrase you choose — '
                 'separate from your unlock PIN. Keep it safe: without it the '
                 'backup cannot be restored.',
-                style: AppTextStyles.bodyMedium
-                    .copyWith(color: scheme.onSurfaceVariant),
+                style:
+                    AppTextStyles.bodyMedium.copyWith(color: c.textSecondary),
               ),
-              const SizedBox(height: AppSpacing.lg),
-              VaultTextField(
+              const SizedBox(height: AppSpacing.md),
+              AppTextField(
                 label: 'Backup passphrase',
                 controller: _passphraseController,
                 obscureText: true,
               ),
-              const SizedBox(height: AppSpacing.lg),
+              const SizedBox(height: AppSpacing.mdl),
               VaultButton(
                 label: 'Export encrypted backup',
                 isLoading: _busy,
@@ -130,11 +130,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
               ),
               if (_status != null) ...[
                 const SizedBox(height: AppSpacing.lg),
-                Text(
-                  _status!,
-                  style: AppTextStyles.bodySmall
-                      .copyWith(color: scheme.onSurfaceVariant),
-                ),
+                AppBanner(title: _status!),
               ],
             ],
           ),
