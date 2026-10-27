@@ -128,6 +128,7 @@ void main() {
         overlay: false,
         notifications: true,
         notificationAccess: false,
+        screenGuardAccess: false,
         batteryExempt: false,
         serviceRunning: false,
       ),

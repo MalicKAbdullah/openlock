@@ -87,9 +87,10 @@ class AboutScreen extends ConsumerWidget {
                     'To remove it yourself: open Settings in OpenLock, turn '
                     'off "Prevent uninstall" (confirm your PIN or fingerprint), '
                     'then uninstall the app normally. While protection is on, '
-                    'OpenLock also guards the system app-info and device-admin '
-                    'screens with the lock so no one can disable it without '
-                    'your PIN.',
+                    'OpenLock also guards its own App info, uninstall, and '
+                    'device-admin screens with the lock (with the uninstall '
+                    'screen guard enabled in Accessibility) so no one can '
+                    'disable it without your PIN.',
                     style: AppTextStyles.bodyMedium.copyWith(
                       color: c.textSecondary,
                     ),

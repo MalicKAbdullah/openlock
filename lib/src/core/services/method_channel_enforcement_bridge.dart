@@ -57,6 +57,7 @@ final class MethodChannelEnforcementBridge implements IEnforcementBridge {
       overlay: raw['overlay'] == true,
       notifications: raw['notifications'] == true,
       notificationAccess: raw['notificationAccess'] == true,
+      screenGuardAccess: raw['screenGuardAccess'] == true,
       batteryExempt: raw['batteryExempt'] == true,
       serviceRunning: raw['serviceRunning'] == true,
     );
@@ -81,6 +82,10 @@ final class MethodChannelEnforcementBridge implements IEnforcementBridge {
   @override
   Future<void> requestNotificationAccess() =>
       _channel.invokeMethod<void>('requestNotificationAccess');
+
+  @override
+  Future<void> requestScreenGuardAccess() =>
+      _channel.invokeMethod<void>('requestScreenGuardAccess');
 
   @override
   Future<bool> isServiceRunning() async =>

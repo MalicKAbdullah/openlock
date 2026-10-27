@@ -28,6 +28,7 @@ final class PermissionStates {
     required this.overlay,
     required this.notifications,
     required this.notificationAccess,
+    required this.screenGuardAccess,
     required this.batteryExempt,
     required this.serviceRunning,
   });
@@ -37,6 +38,7 @@ final class PermissionStates {
         overlay = false,
         notifications = false,
         notificationAccess = false,
+        screenGuardAccess = false,
         batteryExempt = false,
         serviceRunning = false;
 
@@ -48,6 +50,11 @@ final class PermissionStates {
   /// content. Separate from [notifications] (the POST_NOTIFICATIONS runtime
   /// grant for OpenLock's own notices).
   final bool notificationAccess;
+
+  /// OpenLock's uninstall-guard accessibility service is enabled, letting the
+  /// "Prevent uninstall" guard recognise OpenLock's own App info, uninstall,
+  /// and device-admin screens.
+  final bool screenGuardAccess;
   final bool batteryExempt;
   final bool serviceRunning;
 
@@ -62,6 +69,7 @@ final class PermissionStates {
     bool? overlay,
     bool? notifications,
     bool? notificationAccess,
+    bool? screenGuardAccess,
     bool? batteryExempt,
     bool? serviceRunning,
   }) =>
@@ -70,6 +78,7 @@ final class PermissionStates {
         overlay: overlay ?? this.overlay,
         notifications: notifications ?? this.notifications,
         notificationAccess: notificationAccess ?? this.notificationAccess,
+        screenGuardAccess: screenGuardAccess ?? this.screenGuardAccess,
         batteryExempt: batteryExempt ?? this.batteryExempt,
         serviceRunning: serviceRunning ?? this.serviceRunning,
       );
@@ -129,6 +138,11 @@ abstract interface class IEnforcementBridge {
   /// OpenLock's NotificationListenerService (needed to hide locked apps'
   /// notification content). The grant is read back via [getPermissionStates].
   Future<void> requestNotificationAccess();
+
+  /// Opens the system Accessibility settings so the user can enable OpenLock's
+  /// uninstall-guard service. The grant is read back via
+  /// [getPermissionStates].
+  Future<void> requestScreenGuardAccess();
 
   Future<bool> isServiceRunning();
   Future<void> startService();

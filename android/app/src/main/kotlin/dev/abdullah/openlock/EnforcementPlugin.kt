@@ -121,6 +121,10 @@ class EnforcementPlugin(private val activity: Activity) :
                 launch(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
                 result.success(null)
             }
+            "requestScreenGuardAccess" -> {
+                launch(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                result.success(null)
+            }
             "isServiceRunning" -> result.success(OpenLockMonitorService.isRunning)
             "startService" -> {
                 startService()
@@ -268,6 +272,7 @@ class EnforcementPlugin(private val activity: Activity) :
         "overlay" to hasOverlay(),
         "notifications" to hasNotifications(),
         "notificationAccess" to hasNotificationAccess(),
+        "screenGuardAccess" to hasScreenGuardAccess(),
         "batteryExempt" to isBatteryExempt(),
         "serviceRunning" to OpenLockMonitorService.isRunning,
     )
@@ -281,6 +286,17 @@ class EnforcementPlugin(private val activity: Activity) :
         ) ?: return false
         val me = activity.packageName
         return flat.split(':').any { it.startsWith("$me/") }
+    }
+
+    /** Whether OpenLock's uninstall-guard accessibility service is enabled
+     *  (required for the guard to recognise OpenLock's own screens). */
+    private fun hasScreenGuardAccess(): Boolean {
+        val flat = Settings.Secure.getString(
+            activity.contentResolver,
+            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
+        ) ?: return false
+        val me = ComponentName(activity, OpenLockGuardAccessibilityService::class.java)
+        return flat.split(':').any { ComponentName.unflattenFromString(it) == me }
     }
 
     private fun hasUsageAccess(): Boolean {

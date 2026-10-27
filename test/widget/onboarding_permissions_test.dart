@@ -34,6 +34,7 @@ void main() {
         overlay: false,
         notifications: false,
         notificationAccess: false,
+        screenGuardAccess: false,
         batteryExempt: false,
         serviceRunning: false,
       ),
