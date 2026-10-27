@@ -1,10 +1,17 @@
 import 'dart:async';
 
+import 'package:core_crypto/core_crypto.dart';
+import 'package:core_lock/core_lock.dart'
+    show
+        LockBiometricButton,
+        LockLayout,
+        LockShake,
+        LockTextLink,
+        formatLockCountdown;
 import 'package:core_theme/core_theme.dart';
 import 'package:core_ui/core_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:core_crypto/core_crypto.dart';
 import 'package:openlock/src/core/di.dart';
 import 'package:openlock/src/core/router/app_router.dart';
 import 'package:openlock/src/features/auth/providers/auth_providers.dart';
@@ -12,11 +19,18 @@ import 'package:openlock/src/features/auth/services/pin_auth_service.dart';
 import 'package:openlock/src/features/auth/widgets/pin_entry_panel.dart';
 import 'package:openlock/src/features/enforcement/providers/config_providers.dart';
 
-/// Unlock gate for opening OpenLock itself. PIN, optional fingerprint, and an
-/// escalating cooldown after repeated wrong attempts. "Forgot PIN?" resets the
-/// PIN with the recovery key under the same cooldown.
+/// Unlock gate for opening OpenLock itself, on the suite's [LockLayout]: PIN
+/// dots and keypad, an optional fingerprint button low on the screen, and an
+/// escalating cooldown after repeated wrong attempts. "Forgot PIN?" resets
+/// the PIN with the recovery key under the same cooldown.
 class UnlockScreen extends ConsumerStatefulWidget {
   const UnlockScreen({super.key});
+
+  /// Key height bounds. The keypad is sized from the screen height so it fits
+  /// a 360 × 640 phone without scrolling; keys never drop below the tap
+  /// target.
+  static const double minKeyHeight = AppSpacing.tapTarget;
+  static const double maxKeyHeight = 64;
 
   @override
   ConsumerState<UnlockScreen> createState() => _UnlockScreenState();
@@ -28,13 +42,15 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen> {
   Duration _cooldown = Duration.zero;
   Timer? _ticker;
   bool _recovering = false;
+  bool _biometric = false;
+  int _failures = 0;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _syncCooldown();
-      _tryBiometric();
+      _startBiometric();
     });
   }
 
@@ -64,6 +80,17 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen> {
     }
   }
 
+  /// Shows the fingerprint button when biometric unlock is on and starts the
+  /// system prompt once; the button brings the prompt back.
+  Future<void> _startBiometric() async {
+    if (!await ref.read(biometricServiceProvider).isEnabled()) return;
+    if (!mounted) return;
+    setState(() => _biometric = true);
+    await _tryBiometric();
+  }
+
+  /// The system prompt shows its own mismatch and cancel feedback, so a
+  /// failed or dismissed prompt adds nothing here.
   Future<void> _tryBiometric() async {
     final biometric = ref.read(biometricServiceProvider);
     if (!await biometric.isEnabled()) return;
@@ -85,10 +112,11 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen> {
             .read(sessionProvider.notifier)
             .markUnlocked(UnlockMethod.pin, then: AppRoutes.apps);
       case UnlockWrongPin(:final cooldown):
-        _panelKey.currentState
-          ?..shake()
-          ..clear();
-        setState(() => _message = 'Wrong PIN');
+        _panelKey.currentState?.clear();
+        setState(() {
+          _failures++;
+          _message = 'Wrong PIN';
+        });
         if (cooldown != null) await _syncCooldown();
       case UnlockCoolingDown():
         _panelKey.currentState?.clear();
@@ -96,86 +124,72 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen> {
     }
   }
 
+  /// The key height that fits the keypad into [height] (the screen without
+  /// system bars) next to everything else [LockLayout] stacks around it.
+  double _keyHeight(double height) {
+    const column = AppSpacing.lg * 2 + // LockLayout's vertical padding
+        LockLayout.markSize +
+        AppSpacing.md +
+        28 + // the h2 app name
+        AppSpacing.xl +
+        AppSpacing.tapTarget; // "Forgot PIN?"
+    const endorsement = 20 + AppSpacing.mdl;
+    final biometric =
+        _biometric ? LockBiometricButton.size + AppSpacing.xl : 0.0;
+    final keys =
+        height - column - endorsement - biometric - PinEntryPanel.heightFor(0);
+    return (keys / 4).clamp(
+      UnlockScreen.minKeyHeight,
+      UnlockScreen.maxKeyHeight,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final c = SuiteColors.of(context);
     final coolingDown = _cooldown > Duration.zero;
-    return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: Center(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(AppSpacing.lg),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const SuiteAppIcon(app: SuiteApp.openlock, size: 72),
-                      const SizedBox(height: AppSpacing.md),
-                      Text(
-                        'OpenLock',
-                        style: AppTextStyles.h1.copyWith(color: c.textPrimary),
-                      ),
-                      const SizedBox(height: AppSpacing.xs),
-                      Text(
-                        'Enter your PIN to unlock',
-                        style: AppTextStyles.bodyMedium.copyWith(
-                          color: c.textSecondary,
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      SizedBox(
-                        height: 20,
-                        child: Text(
-                          coolingDown
-                              ? 'Too many attempts. Try again in '
-                                  '${_cooldown.inSeconds}s'
-                              : (_message ?? ''),
-                          style: AppTextStyles.caption.copyWith(
-                            color: c.negative,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-                      if (_recovering)
-                        _RecoveryForm(
-                          enabled: !coolingDown,
-                          onCooldown: _syncCooldown,
-                          onBack: () => setState(() => _recovering = false),
-                        )
-                      else ...[
-                        PinEntryPanel(
-                          key: _panelKey,
-                          enabled: !coolingDown,
-                          onSubmit: _submit,
-                        ),
-                        const SizedBox(height: AppSpacing.sm),
-                        TextButton.icon(
-                          onPressed: coolingDown ? null : _tryBiometric,
-                          icon: const Icon(Icons.fingerprint),
-                          label: const Text('Use fingerprint'),
-                        ),
-                        TextButton(
-                          onPressed: () => setState(() {
-                            _message = null;
-                            _recovering = true;
-                          }),
-                          child: const Text('Forgot PIN?'),
-                        ),
-                      ],
-                    ],
+    final error = coolingDown
+        ? 'Too many attempts. Try again in ${formatLockCountdown(_cooldown)}.'
+        : _message;
+    return LayoutBuilder(
+      builder: (context, box) {
+        final height = box.maxHeight - MediaQuery.paddingOf(context).vertical;
+        return LockLayout(
+          mark: const SuiteAppIcon(app: SuiteApp.openlock, size: 64),
+          title: 'OpenLock',
+          message: _recovering ? 'Reset your PIN' : null,
+          bottom: _biometric
+              ? LockBiometricButton(
+                  onPressed: coolingDown ? null : _tryBiometric,
+                )
+              : null,
+          children: _recovering
+              ? [
+                  _RecoveryForm(
+                    enabled: !coolingDown,
+                    error: coolingDown ? error : null,
+                    onCooldown: _syncCooldown,
+                    onBack: () => setState(() => _recovering = false),
                   ),
-                ),
-              ),
-            ),
-            const Padding(
-              padding: EdgeInsets.only(bottom: AppSpacing.md),
-              child: SuiteEndorsement(),
-            ),
-          ],
-        ),
-      ),
+                ]
+              : [
+                  PinEntryPanel(
+                    key: _panelKey,
+                    enabled: !coolingDown,
+                    error: error,
+                    failures: _failures,
+                    keyHeight: _keyHeight(height),
+                    onSubmit: _submit,
+                  ),
+                  LockTextLink(
+                    label: 'Forgot PIN?',
+                    onPressed: () => setState(() {
+                      _message = null;
+                      _recovering = true;
+                    }),
+                  ),
+                ],
+        );
+      },
     );
   }
 }
@@ -185,11 +199,15 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen> {
 class _RecoveryForm extends ConsumerStatefulWidget {
   const _RecoveryForm({
     required this.enabled,
+    required this.error,
     required this.onCooldown,
     required this.onBack,
   });
 
   final bool enabled;
+
+  /// The cooldown line, shown in place of the form's own error.
+  final String? error;
   final Future<void> Function() onCooldown;
   final VoidCallback onBack;
 
@@ -205,6 +223,7 @@ class _RecoveryFormState extends ConsumerState<_RecoveryForm> {
       ref.read(pinAuthServiceProvider).hasRecoveryKey();
   bool _busy = false;
   String? _error;
+  int _failures = 0;
 
   @override
   void dispose() {
@@ -226,7 +245,10 @@ class _RecoveryFormState extends ConsumerState<_RecoveryForm> {
       problem = null;
     }
     if (problem != null) {
-      setState(() => _error = problem);
+      setState(() {
+        _error = problem;
+        _failures++;
+      });
       return;
     }
     setState(() {
@@ -244,7 +266,10 @@ class _RecoveryFormState extends ConsumerState<_RecoveryForm> {
       case UnlockSuccess():
         break;
       case UnlockWrongPin(:final cooldown):
-        setState(() => _error = 'That recovery key is not right');
+        setState(() {
+          _error = 'That recovery key is not right';
+          _failures++;
+        });
         if (cooldown != null) await widget.onCooldown();
       case UnlockCoolingDown():
         await widget.onCooldown();
@@ -273,15 +298,18 @@ class _RecoveryFormState extends ConsumerState<_RecoveryForm> {
               style: AppTextStyles.bodySmall.copyWith(color: c.textSecondary),
             ),
             if (hasKey) ...[
-              const SizedBox(height: AppSpacing.md),
+              const SizedBox(height: AppSpacing.lg),
               AppTextField(
                 controller: _key,
                 label: 'Recovery key',
                 hint: 'XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX',
                 monospace: true,
+                autocorrect: false,
+                enableSuggestions: false,
+                textCapitalization: TextCapitalization.characters,
                 textInputAction: TextInputAction.next,
               ),
-              const SizedBox(height: AppSpacing.smd),
+              const SizedBox(height: LockLayout.gap),
               AppTextField(
                 controller: _pin,
                 label: 'New PIN',
@@ -289,28 +317,34 @@ class _RecoveryFormState extends ConsumerState<_RecoveryForm> {
                 monospace: true,
                 clearable: false,
                 keyboardType: TextInputType.number,
+                textInputAction: TextInputAction.next,
               ),
-              const SizedBox(height: AppSpacing.smd),
-              AppTextField(
-                controller: _confirm,
-                label: 'Confirm new PIN',
-                obscureText: true,
-                monospace: true,
-                clearable: false,
-                keyboardType: TextInputType.number,
-                errorText: _error,
-                onSubmitted: (_) => _submit(),
+              const SizedBox(height: LockLayout.gap),
+              LockShake(
+                trigger: _failures,
+                child: AppTextField(
+                  controller: _confirm,
+                  label: 'Confirm new PIN',
+                  obscureText: true,
+                  monospace: true,
+                  clearable: false,
+                  keyboardType: TextInputType.number,
+                  textInputAction: TextInputAction.go,
+                  errorText: widget.error ?? _error,
+                  onSubmitted: (_) => _submit(),
+                ),
               ),
-              const SizedBox(height: AppSpacing.md),
+              const SizedBox(height: LockLayout.gap),
               VaultButton(
-                label: 'Reset PIN and unlock',
+                label: 'Reset and unlock',
                 isLoading: _busy,
                 onPressed: widget.enabled && !_busy ? _submit : null,
               ),
             ],
-            TextButton(
+            const SizedBox(height: AppSpacing.sm),
+            LockTextLink(
+              label: 'Back to unlock',
               onPressed: _busy ? null : widget.onBack,
-              child: const Text('Back to PIN'),
             ),
           ],
         );
