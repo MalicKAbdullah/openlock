@@ -98,8 +98,7 @@ final class SessionNotifier extends Notifier<AuthStatus> {
 
   /// Whether [changePin] may skip the current PIN: the session was opened
   /// with a fingerprint, which is confirmed again at change time.
-  bool get canChangePinWithBiometric =>
-      _unlockedWith == UnlockMethod.biometric;
+  bool get canChangePinWithBiometric => _unlockedWith == UnlockMethod.biometric;
 
   /// Changes the PIN. Proof is [oldPin], or — when [canChangePinWithBiometric]
   /// and [oldPin] is null — a fresh fingerprint. Pushes the new verifier to

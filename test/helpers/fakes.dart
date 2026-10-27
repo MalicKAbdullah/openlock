@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:core_storage/core_storage.dart';
@@ -103,6 +104,12 @@ final class FakeEnforcementBridge implements IEnforcementBridge {
             );
 
   List<InstalledApp> apps;
+
+  /// Icon file paths by package name; packages missing here have no icon.
+  Map<String, String> iconPaths = {};
+
+  /// The packages of each [getAppIcons] call, in order.
+  final List<List<String>> iconRequests = [];
   PermissionStates permissions;
   Map<String, dynamic>? lastPushedConfig;
   final List<IntruderRecord> records = [];
@@ -115,8 +122,22 @@ final class FakeEnforcementBridge implements IEnforcementBridge {
   Future<void> pushConfig(Map<String, dynamic> config) async =>
       lastPushedConfig = config;
 
+  /// When set, [getInstalledApps] waits for it, like a slow native query.
+  Completer<void>? holdApps;
+
   @override
-  Future<List<InstalledApp>> getInstalledApps() async => apps;
+  Future<List<InstalledApp>> getInstalledApps() async {
+    await holdApps?.future;
+    return apps;
+  }
+
+  @override
+  Future<Map<String, String?>> getAppIcons(List<InstalledApp> apps) async {
+    iconRequests.add([for (final app in apps) app.packageName]);
+    return {
+      for (final app in apps) app.packageName: iconPaths[app.packageName]
+    };
+  }
 
   @override
   Future<PermissionStates> getPermissionStates() async => permissions;
