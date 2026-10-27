@@ -38,37 +38,37 @@ dependencies:
     git:
       url: https://github.com/MalicKAbdullah/secure-suite-core.git
       path: core_crypto
-      ref: 5c21f136649d951e2423c03ffdbba7186fb362b1
+      ref: 5d0679db35ff31129f72bb363385a3574f5b7b1a
   core_storage:
     git:
       url: https://github.com/MalicKAbdullah/secure-suite-core.git
       path: core_storage
-      ref: 5c21f136649d951e2423c03ffdbba7186fb362b1
+      ref: 5d0679db35ff31129f72bb363385a3574f5b7b1a
   core_lock:
     git:
       url: https://github.com/MalicKAbdullah/secure-suite-core.git
       path: core_lock
-      ref: 5c21f136649d951e2423c03ffdbba7186fb362b1
+      ref: 5d0679db35ff31129f72bb363385a3574f5b7b1a
   core_security:
     git:
       url: https://github.com/MalicKAbdullah/secure-suite-core.git
       path: core_security
-      ref: 5c21f136649d951e2423c03ffdbba7186fb362b1
+      ref: 5d0679db35ff31129f72bb363385a3574f5b7b1a
   core_theme:
     git:
       url: https://github.com/MalicKAbdullah/secure-suite-core.git
       path: core_theme
-      ref: 5c21f136649d951e2423c03ffdbba7186fb362b1
+      ref: 5d0679db35ff31129f72bb363385a3574f5b7b1a
   core_ui:
     git:
       url: https://github.com/MalicKAbdullah/secure-suite-core.git
       path: core_ui
-      ref: 5c21f136649d951e2423c03ffdbba7186fb362b1
+      ref: 5d0679db35ff31129f72bb363385a3574f5b7b1a
   core_update:
     git:
       url: https://github.com/MalicKAbdullah/secure-suite-core.git
       path: core_update
-      ref: 5c21f136649d951e2423c03ffdbba7186fb362b1
+      ref: 5d0679db35ff31129f72bb363385a3574f5b7b1a
 
 dev_dependencies:
   flutter_test:
