@@ -7,15 +7,18 @@ import 'package:openlock/src/core/di.dart';
 import 'package:openlock/src/core/storage_keys.dart';
 import 'package:openlock/src/features/auth/providers/auth_providers.dart';
 import 'package:openlock/src/features/auth/screens/unlock_screen.dart';
+import 'package:openlock/src/features/enforcement/models/lock_config.dart';
 
 import '../helpers/fakes.dart';
 
 void main() {
   late FakeSecureStorage storage;
   late FakeClock clock;
+  late FakeConfigFileStore configFiles;
 
   setUp(() {
     storage = FakeSecureStorage();
+    configFiles = FakeConfigFileStore();
     clock = FakeClock(DateTime(2026, 10, 27, 9));
   });
 
@@ -23,6 +26,7 @@ void main() {
     WidgetTester tester, {
     Size size = const Size(390, 844),
     bool biometric = false,
+    bool randomizeKeypad = false,
   }) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = size;
@@ -38,10 +42,15 @@ void main() {
             .overrideWithValue(FakeBiometricAuth(willSucceed: false)),
         keyDerivationProvider.overrideWithValue(const FakeKeyDerivation()),
         enforcementBridgeProvider.overrideWithValue(FakeEnforcementBridge()),
-        configFileStoreProvider.overrideWithValue(FakeConfigFileStore()),
+        configFileStoreProvider.overrideWithValue(configFiles),
       ],
     );
     addTearDown(container.dispose);
+    if (randomizeKeypad) {
+      await container
+          .read(configRepositoryProvider)
+          .save(const LockConfig(randomizeKeypad: true));
+    }
     // As in main: the unlock flags are read before the first frame.
     await container.read(sessionProvider.notifier).resolved;
     await tester.pumpWidget(
@@ -55,6 +64,21 @@ void main() {
     );
     await tester.pumpAndSettle();
   }
+
+  /// The digit keys' labels in reading order (row by row, left to right).
+  List<String> keypadOrder(WidgetTester tester) {
+    final digits = [for (var i = 0; i < 10; i++) '$i'];
+    final centers = {
+      for (final d in digits) d: tester.getCenter(find.text(d)),
+    };
+    return digits
+      ..sort((a, b) {
+        final dy = centers[a]!.dy.compareTo(centers[b]!.dy);
+        return dy != 0 ? dy : centers[a]!.dx.compareTo(centers[b]!.dx);
+      });
+  }
+
+  const phoneOrder = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
 
   /// Unmounts the screen so its cooldown ticker is cancelled.
   Future<void> unmount(WidgetTester tester) =>
@@ -114,5 +138,27 @@ void main() {
     await tester.tap(find.text('Back to unlock'));
     await tester.pumpAndSettle();
     expect(find.text('Forgot PIN?'), findsOneWidget);
+  });
+
+  testWidgets('the keypad keeps phone order when Randomize keypad is off',
+      (tester) async {
+    await pump(tester);
+    expect(keypadOrder(tester), phoneOrder);
+  });
+
+  testWidgets('Randomize keypad shuffles the digits on every show',
+      (tester) async {
+    await pump(tester, randomizeKeypad: true);
+    final first = keypadOrder(tester);
+    await unmount(tester);
+    await pump(tester, randomizeKeypad: true);
+    final second = keypadOrder(tester);
+
+    // Each order is a permutation of all ten digits; two secure shuffles
+    // (or a shuffle and phone order) coincide with probability 1/10!.
+    expect(first.toSet(), phoneOrder.toSet());
+    expect(second.toSet(), phoneOrder.toSet());
+    expect(first, isNot(phoneOrder));
+    expect(first, isNot(second));
   });
 }

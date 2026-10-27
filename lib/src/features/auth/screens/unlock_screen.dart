@@ -140,6 +140,9 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // The session resolves the config before the unlock screen's first frame.
+    final randomize = ref.watch(configControllerProvider
+        .select((config) => config.requireValue.randomizeKeypad));
     final coolingDown = _cooldown > Duration.zero;
     final error = coolingDown
         ? 'Too many attempts. Try again in ${formatLockCountdown(_cooldown)}.'
@@ -169,6 +172,7 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen> {
                   PinEntryPanel(
                     key: _panelKey,
                     enabled: !coolingDown,
+                    randomize: randomize,
                     error: error,
                     failures: _failures,
                     keyHeight: _keyHeight(height),

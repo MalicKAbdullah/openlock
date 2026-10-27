@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- The native LockActivity window background before its views draw:
+         LockPalette's light background here, its dark one in values-night. -->
+    <color name="lockBackground">#FFF6F7F9</color>
     <!-- OpenLock brand — cyan guard on graphite, used by the native
-         LockActivity and monitor notification. -->
-    <color name="lockBackground">#FF0A0C10</color>
+         LockActivity's decoy cover. -->
     <color name="lockSurface">#FF12151A</color>
     <color name="lockAccent">#FF3FD0EE</color>
     <color name="lockOnAccent">#FF0A0C10</color>

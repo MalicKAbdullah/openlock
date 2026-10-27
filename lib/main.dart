@@ -8,7 +8,6 @@ import 'package:openlock/src/core/di.dart';
 import 'package:openlock/src/core/perf_log.dart';
 import 'package:openlock/src/features/apps/providers/apps_providers.dart';
 import 'package:openlock/src/features/auth/providers/auth_providers.dart';
-import 'package:openlock/src/features/enforcement/providers/config_providers.dart';
 import 'package:openlock/src/features/intruder/providers/intruder_providers.dart';
 
 Future<void> main() async {
@@ -34,7 +33,8 @@ Future<void> main() async {
     ],
   );
   // The first frame is already the right gate (unlock, setup or intro), and
-  // the unlock screen knows whether to prompt for a fingerprint.
+  // the unlock screen knows whether to prompt for a fingerprint and whether
+  // to shuffle the keypad.
   await container.read(sessionProvider.notifier).resolved;
   PerfLog.mark('secure storage ready');
 
@@ -52,6 +52,5 @@ Future<void> main() async {
   // moment the user is in.
   container
     ..read(installedAppsProvider)
-    ..read(configControllerProvider)
     ..read(intruderControllerProvider);
 }

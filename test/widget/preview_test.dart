@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -114,6 +115,24 @@ void main() {
       for (final MapEntry(:key, :value) in icons!.entries)
         key: (File('${iconDir.path}/$key.png')..writeAsBytesSync(value)).path,
     };
+    // The rows draw Image.file decoded at 40 dp @2x. File reads and decodes
+    // started under the fake clock never complete, so the icons are decoded
+    // into the image cache in real time first and every row finds its icon
+    // there.
+    await tester.runAsync(() async {
+      for (final path in iconPaths.values) {
+        final done = Completer<void>();
+        ResizeImage(FileImage(File(path)), width: 80, height: 80)
+            .resolve(ImageConfiguration.empty)
+            .addListener(
+              ImageStreamListener(
+                (_, __) => done.complete(),
+                onError: done.completeError,
+              ),
+            );
+        await done.future;
+      }
+    });
     InstalledApp app(String pkg, String label) =>
         InstalledApp(packageName: pkg, label: label, versionCode: 1);
 
@@ -327,13 +346,32 @@ void main() {
         );
       }
     }
+
+    // The apps list on a narrow phone, at default and large text.
+    for (final (name, textScale) in [
+      ('apps-360', 1.0),
+      ('apps-360-1.3x', 1.3)
+    ]) {
+      for (final b in Brightness.values) {
+        await _shoot(
+          tester,
+          name: name,
+          size: const Size(360, 1100),
+          mode: b,
+          container: seeded,
+          screen: const AppPickerScreen(),
+          textScale: textScale,
+        );
+      }
+    }
   });
 }
 
 const _phone = Size(390, 844);
 
-/// Renders [screen] at [size] @2x with the theme picked by a saved
-/// appearance choice of [mode], runs [then], and writes `<name>-<mode>.png`.
+/// Renders [screen] at [size] @2x and [textScale] with the theme picked by a
+/// saved appearance choice of [mode], runs [then], and writes
+/// `<name>-<mode>.png`.
 Future<void> _shoot(
   WidgetTester tester, {
   required String name,
@@ -342,6 +380,7 @@ Future<void> _shoot(
   required ProviderContainer container,
   required Widget screen,
   Future<void> Function()? then,
+  double textScale = 1,
 }) async {
   tester.view.devicePixelRatio = 2;
   tester.view.physicalSize = size * 2;
@@ -371,6 +410,11 @@ Future<void> _shoot(
                 accent: AppAccents.openlock,
               ),
               themeMode: appearance.mode,
+              builder: (context, child) => MediaQuery(
+                data: MediaQuery.of(context)
+                    .copyWith(textScaler: TextScaler.linear(textScale)),
+                child: child!,
+              ),
               home: screen,
             ),
           ),
@@ -379,10 +423,6 @@ Future<void> _shoot(
     ),
   );
   await tester.pump(const Duration(milliseconds: 300));
-  // Icon files decode on real I/O, outside the fake clock.
-  await tester.runAsync(
-    () => Future<void>.delayed(const Duration(milliseconds: 200)),
-  );
   await tester.pump(const Duration(milliseconds: 300));
   await tester.pump(const Duration(milliseconds: 300));
   if (then != null) {

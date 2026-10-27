@@ -19,4 +19,11 @@
     <style name="NormalTheme" parent="@android:style/Theme.Black.NoTitleBar">
         <item name="android:windowBackground">?android:colorBackground</item>
     </style>
+    <!-- The native on-top lock screen in device dark mode. -->
+    <style name="LockTheme" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/lockBackground</item>
+        <item name="android:statusBarColor">@color/lockBackground</item>
+        <item name="android:navigationBarColor">@color/lockBackground</item>
+        <item name="android:windowNoTitle">true</item>
+    </style>
 </resources>

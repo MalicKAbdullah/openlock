@@ -53,13 +53,16 @@ final class SessionNotifier extends Notifier<AuthStatus> {
   }
 
   /// Reads everything the locked → unlocked step needs up front, so nothing
-  /// is read between a successful fingerprint and the home screen.
+  /// is read between a successful fingerprint and the home screen. The
+  /// config is loaded too, so the unlock screen's first frame already has
+  /// the keypad order.
   Future<void> _resolve() async {
     final auth = ref.read(pinAuthServiceProvider);
-    final (hasPin, biometricEnabled, recoveryOfferDue) = await (
+    final (hasPin, biometricEnabled, recoveryOfferDue, _) = await (
       auth.hasPin(),
       ref.read(biometricServiceProvider).isEnabled(),
       auth.recoveryOfferDue(),
+      ref.read(configControllerProvider.future),
     ).wait;
     _biometricEnabled = biometricEnabled;
     _recoveryOfferDue = recoveryOfferDue;
