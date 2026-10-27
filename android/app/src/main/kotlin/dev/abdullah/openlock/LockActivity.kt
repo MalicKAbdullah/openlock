@@ -244,7 +244,8 @@ class LockActivity : FragmentActivity() {
     }
 
     private fun buildKeypad(): View {
-        val digits = (0..9).map { it.toString() }.toMutableList()
+        // Phone-keypad order: 1-9 across three rows, 0 beside the check key.
+        val digits = (1..10).map { (it % 10).toString() }.toMutableList()
         if (store.randomizeKeypad()) digits.shuffle(SecureRandom())
 
         val grid = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
