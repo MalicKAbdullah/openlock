@@ -208,6 +208,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
         child: PageList(
           children: [
             const ScreenHeader(eyebrow: 'OpenLock', title: 'Settings'),
+            RowGroup(
+              children: [
+                AppearanceSetting(controller: ref.watch(appearanceProvider)),
+              ],
+            ),
             const SectionLead('Protection'),
             RowGroup(
               children: [

@@ -1,4 +1,5 @@
 import 'package:core_storage/core_storage.dart';
+import 'package:core_theme/core_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -19,11 +20,18 @@ Future<void> main() async {
   // flutter_secure_storage keys (the native ConfigStore keeps its own prefs
   // file), and no value waits for a user gesture: the fingerprint only gates
   // entry, and the config key is random, not derived from the PIN.
+  // The appearance choice is a tiny plain-prefs read, made alongside it so
+  // the first frame has the right theme.
+  final appearanceLoad = AppearanceController.load();
   final storage = await CachedSecureStorage.load(
     const SecureStorageImpl(FlutterSecureStorage()),
   );
+  final appearance = await appearanceLoad;
   final container = ProviderContainer(
-    overrides: [secureStorageProvider.overrideWithValue(storage)],
+    overrides: [
+      secureStorageProvider.overrideWithValue(storage),
+      appearanceProvider.overrideWithValue(appearance),
+    ],
   );
   // The first frame is already the right gate (unlock, setup or intro), and
   // the unlock screen knows whether to prompt for a fingerprint.

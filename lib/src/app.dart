@@ -1,6 +1,7 @@
 import 'package:core_theme/core_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:openlock/src/core/di.dart';
 import 'package:openlock/src/core/router/app_router.dart';
 
 class OpenLockApp extends ConsumerWidget {
@@ -9,13 +10,17 @@ class OpenLockApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(appRouterProvider);
-    return MaterialApp.router(
-      title: 'OpenLock',
-      theme: AppTheme.build(Brightness.light, accent: AppAccents.openlock),
-      darkTheme: AppTheme.build(Brightness.dark, accent: AppAccents.openlock),
-      themeMode: ThemeMode.system,
-      routerConfig: router,
-      debugShowCheckedModeBanner: false,
+    final appearance = ref.watch(appearanceProvider);
+    return ListenableBuilder(
+      listenable: appearance,
+      builder: (context, _) => MaterialApp.router(
+        title: 'OpenLock',
+        theme: AppTheme.build(Brightness.light, accent: AppAccents.openlock),
+        darkTheme: AppTheme.build(Brightness.dark, accent: AppAccents.openlock),
+        themeMode: appearance.mode,
+        routerConfig: router,
+        debugShowCheckedModeBanner: false,
+      ),
     );
   }
 }
