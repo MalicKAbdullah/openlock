@@ -346,13 +346,32 @@ void main() {
         );
       }
     }
+
+    // The apps list on a narrow phone, at default and large text.
+    for (final (name, textScale) in [
+      ('apps-360', 1.0),
+      ('apps-360-1.3x', 1.3)
+    ]) {
+      for (final b in Brightness.values) {
+        await _shoot(
+          tester,
+          name: name,
+          size: const Size(360, 1100),
+          mode: b,
+          container: seeded,
+          screen: const AppPickerScreen(),
+          textScale: textScale,
+        );
+      }
+    }
   });
 }
 
 const _phone = Size(390, 844);
 
-/// Renders [screen] at [size] @2x with the theme picked by a saved
-/// appearance choice of [mode], runs [then], and writes `<name>-<mode>.png`.
+/// Renders [screen] at [size] @2x and [textScale] with the theme picked by a
+/// saved appearance choice of [mode], runs [then], and writes
+/// `<name>-<mode>.png`.
 Future<void> _shoot(
   WidgetTester tester, {
   required String name,
@@ -361,6 +380,7 @@ Future<void> _shoot(
   required ProviderContainer container,
   required Widget screen,
   Future<void> Function()? then,
+  double textScale = 1,
 }) async {
   tester.view.devicePixelRatio = 2;
   tester.view.physicalSize = size * 2;
@@ -390,6 +410,11 @@ Future<void> _shoot(
                 accent: AppAccents.openlock,
               ),
               themeMode: appearance.mode,
+              builder: (context, child) => MediaQuery(
+                data: MediaQuery.of(context)
+                    .copyWith(textScaler: TextScaler.linear(textScale)),
+                child: child!,
+              ),
               home: screen,
             ),
           ),

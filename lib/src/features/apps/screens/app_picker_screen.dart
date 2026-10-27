@@ -304,10 +304,18 @@ class _AppTile extends ConsumerWidget {
         ),
         // Per-app notification-hiding override, only meaningful once the app is
         // locked. Reflects the effective choice (override, else the global
-        // default) and writes an explicit per-app override.
+        // default) and writes an explicit per-app override. Inset like
+        // AppListRow, so it starts under the app's name, its switch lines up
+        // under the lock switch, and the label wraps rather than pushing the
+        // switch out of the card.
         if (locked)
           Padding(
-            padding: const EdgeInsets.only(left: 56, right: 4, bottom: 4),
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md + _iconSize + AppSpacing.smd + 2,
+              0,
+              AppSpacing.md,
+              AppSpacing.sm,
+            ),
             child: Row(
               children: [
                 Icon(
@@ -324,6 +332,7 @@ class _AppTile extends ConsumerWidget {
                     ),
                   ),
                 ),
+                const SizedBox(width: AppSpacing.smd),
                 Switch(
                   value: config.hidesNotificationsFor(app.packageName),
                   onChanged: (value) => ref
