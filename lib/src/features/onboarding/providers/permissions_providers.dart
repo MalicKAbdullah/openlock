@@ -23,6 +23,8 @@ final class PermissionsController extends AsyncNotifier<PermissionStates> {
   Future<void> requestBattery() => _bridge.requestBatteryExemption();
   Future<void> requestNotifications() =>
       _bridge.requestNotificationPermission();
+  Future<void> requestNotificationAccess() =>
+      _bridge.requestNotificationAccess();
 
   Future<void> startService() async {
     await _bridge.startService();

@@ -91,6 +91,11 @@ class OpenLockMonitorService : Service() {
         }
         lastForegroundPkg = current
 
+        // Once the user is in an app, its hidden-notification backlog is stale —
+        // clear OpenLock's redacted notice for it. (No-op when the listener is
+        // off or nothing was hidden.)
+        OpenLockNotificationListenerService.onAppForegrounded(current)
+
         // Never lock ourselves.
         if (current == packageName) return
 

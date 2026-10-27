@@ -121,6 +121,7 @@ void main() {
         usageAccess: true,
         overlay: false,
         notifications: true,
+        notificationAccess: false,
         batteryExempt: false,
         serviceRunning: false,
       ),

@@ -22,6 +22,7 @@ final class PermissionStates {
     required this.usageAccess,
     required this.overlay,
     required this.notifications,
+    required this.notificationAccess,
     required this.batteryExempt,
     required this.serviceRunning,
   });
@@ -30,12 +31,18 @@ final class PermissionStates {
       : usageAccess = false,
         overlay = false,
         notifications = false,
+        notificationAccess = false,
         batteryExempt = false,
         serviceRunning = false;
 
   final bool usageAccess;
   final bool overlay;
   final bool notifications;
+
+  /// Notification-listener access, required to hide locked apps' notification
+  /// content. Separate from [notifications] (the POST_NOTIFICATIONS runtime
+  /// grant for OpenLock's own notices).
+  final bool notificationAccess;
   final bool batteryExempt;
   final bool serviceRunning;
 
@@ -49,6 +56,7 @@ final class PermissionStates {
     bool? usageAccess,
     bool? overlay,
     bool? notifications,
+    bool? notificationAccess,
     bool? batteryExempt,
     bool? serviceRunning,
   }) =>
@@ -56,6 +64,7 @@ final class PermissionStates {
         usageAccess: usageAccess ?? this.usageAccess,
         overlay: overlay ?? this.overlay,
         notifications: notifications ?? this.notifications,
+        notificationAccess: notificationAccess ?? this.notificationAccess,
         batteryExempt: batteryExempt ?? this.batteryExempt,
         serviceRunning: serviceRunning ?? this.serviceRunning,
       );
@@ -105,6 +114,11 @@ abstract interface class IEnforcementBridge {
   Future<void> requestOverlayPermission();
   Future<void> requestBatteryExemption();
   Future<void> requestNotificationPermission();
+
+  /// Opens the system "Notification access" screen so the user can grant
+  /// OpenLock's NotificationListenerService (needed to hide locked apps'
+  /// notification content). The grant is read back via [getPermissionStates].
+  Future<void> requestNotificationAccess();
 
   Future<bool> isServiceRunning();
   Future<void> startService();

@@ -31,3 +31,8 @@ jobs:
         run: flutter test
       - name: Build debug APK
         run: flutter build apk --debug
+      - name: Kotlin unit tests
+        working-directory: android
+        # Runs after the APK build so local.properties (flutter.sdk) exists.
+        # Compiles the Kotlin test sources and the main sources they exercise.
+        run: ./gradlew :app:testDebugUnitTest
