@@ -22,23 +22,28 @@ final class MethodChannelEnforcementBridge implements IEnforcementBridge {
     final raw = await _channel.invokeListMethod<Map<Object?, Object?>>(
       'getInstalledApps',
     );
-    if (raw == null) return const [];
-    return raw.map((m) {
-      final iconB64 = m['icon'] as String?;
-      Uint8List? icon;
-      if (iconB64 != null && iconB64.isNotEmpty) {
-        try {
-          icon = base64Decode(iconB64);
-        } catch (_) {
-          icon = null;
-        }
-      }
-      return InstalledApp(
-        packageName: m['packageName'] as String? ?? '',
-        label: m['label'] as String? ?? '',
-        icon: icon,
-      );
-    }).toList();
+    return [
+      for (final m in raw!)
+        InstalledApp(
+          packageName: m['packageName']! as String,
+          label: m['label']! as String,
+          versionCode: m['versionCode']! as int,
+        ),
+    ];
+  }
+
+  @override
+  Future<Map<String, String?>> getAppIcons(List<InstalledApp> apps) async {
+    final raw = await _channel.invokeMapMethod<String, String?>(
+      'getAppIcons',
+      {
+        'apps': [
+          for (final app in apps)
+            {'packageName': app.packageName, 'versionCode': app.versionCode},
+        ],
+      },
+    );
+    return raw!;
   }
 
   @override

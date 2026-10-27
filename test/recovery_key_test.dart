@@ -140,6 +140,7 @@ void main() {
       await storage.write(key: OpenLockKeys.biometricEnabled, value: 'true');
       await container.read(pinAuthServiceProvider).setupPin('123456');
       await container.read(configControllerProvider.future);
+      await container.read(sessionProvider.notifier).resolved;
     });
 
     tearDown(() => container.dispose());
@@ -148,7 +149,7 @@ void main() {
 
     test('a fingerprint session changes the PIN after a fresh fingerprint',
         () async {
-      await session().markUnlocked(UnlockMethod.biometric, then: '/apps');
+      session().markUnlocked(UnlockMethod.biometric, then: '/apps');
       expect(session().canChangePinWithBiometric, isTrue);
 
       biometric.willSucceed = false;
@@ -167,7 +168,7 @@ void main() {
     });
 
     test('a PIN session must give the current PIN', () async {
-      await session().markUnlocked(UnlockMethod.pin, then: '/apps');
+      session().markUnlocked(UnlockMethod.pin, then: '/apps');
       expect(session().canChangePinWithBiometric, isFalse);
       expect(
         await session().changePin(oldPin: null, newPin: '222222'),
@@ -190,7 +191,6 @@ void main() {
       final result = await session().recover(
         recoveryKey: key,
         newPin: '333333',
-        then: '/apps',
       );
       expect(result, isA<UnlockSuccess>());
       expect(container.read(sessionProvider), AuthStatus.unlocked);
@@ -199,8 +199,15 @@ void main() {
       expect(container.read(recoveryOfferProvider), isNull);
     });
 
+    test('unlock flags are known before the prompt; unlocking is immediate',
+        () {
+      expect(session().biometricEnabled, isTrue);
+      session().markUnlocked(UnlockMethod.biometric, then: '/apps');
+      expect(container.read(sessionProvider), AuthStatus.unlocked);
+    });
+
     test('an unlock without a key queues the one-time offer', () async {
-      await session().markUnlocked(UnlockMethod.pin, then: '/apps');
+      session().markUnlocked(UnlockMethod.pin, then: '/apps');
       final offer = container.read(recoveryOfferProvider);
       expect(offer, isNotNull);
       expect(offer!.key, isNull);

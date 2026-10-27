@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:openlock/src/core/di.dart';
+import 'package:openlock/src/core/perf_log.dart';
 import 'package:openlock/src/core/storage_keys.dart';
 import 'package:openlock/src/features/auth/services/pin_auth_service.dart';
 import 'package:openlock/src/features/enforcement/providers/config_providers.dart';
@@ -31,18 +32,37 @@ final onboardingSeenProvider = FutureProvider<bool>((ref) async {
 
 final class SessionNotifier extends Notifier<AuthStatus> {
   UnlockMethod? _unlockedWith;
+  late Future<void> _resolved;
+  bool _biometricEnabled = false;
+  bool _recoveryOfferDue = false;
 
   /// How this session was unlocked; null while locked.
   UnlockMethod? get unlockedWith => _unlockedWith;
 
+  /// Completes once the status and the unlock flags below are read.
+  Future<void> get resolved => _resolved;
+
+  /// Whether the unlock screen prompts for a fingerprint. Read with the
+  /// status, so the prompt can fire on the unlock screen's first frame.
+  bool get biometricEnabled => _biometricEnabled;
+
   @override
   AuthStatus build() {
-    _resolve();
+    _resolved = _resolve();
     return AuthStatus.unknown;
   }
 
+  /// Reads everything the locked → unlocked step needs up front, so nothing
+  /// is read between a successful fingerprint and the home screen.
   Future<void> _resolve() async {
-    final hasPin = await ref.read(pinAuthServiceProvider).hasPin();
+    final auth = ref.read(pinAuthServiceProvider);
+    final (hasPin, biometricEnabled, recoveryOfferDue) = await (
+      auth.hasPin(),
+      ref.read(biometricServiceProvider).isEnabled(),
+      auth.recoveryOfferDue(),
+    ).wait;
+    _biometricEnabled = biometricEnabled;
+    _recoveryOfferDue = recoveryOfferDue;
     state = hasPin ? AuthStatus.locked : AuthStatus.needsSetup;
   }
 
@@ -70,13 +90,18 @@ final class SessionNotifier extends Notifier<AuthStatus> {
   }
 
   /// Unlocks; queues the one-time recovery-key offer when it is due.
-  Future<void> markUnlocked(UnlockMethod method, {required String then}) async {
-    if (await ref.read(pinAuthServiceProvider).recoveryOfferDue()) {
+  void markUnlocked(UnlockMethod method, {required String then}) {
+    if (_recoveryOfferDue) {
       ref.read(recoveryOfferProvider.notifier).state =
           RecoveryOffer(then: then);
     }
+    _open(method);
+  }
+
+  void _open(UnlockMethod method) {
     _unlockedWith = method;
     state = AuthStatus.unlocked;
+    PerfLog.mark('unlocked (${method.name})');
   }
 
   /// Forgotten PIN: a matching recovery key sets [newPin], pushes the new
@@ -84,22 +109,21 @@ final class SessionNotifier extends Notifier<AuthStatus> {
   Future<UnlockResult> recover({
     required String recoveryKey,
     required String newPin,
-    required String then,
   }) async {
     final result = await ref
         .read(pinAuthServiceProvider)
         .resetWithRecoveryKey(recoveryKey: recoveryKey, newPin: newPin);
     if (result is UnlockSuccess) {
       await ref.read(configControllerProvider.notifier).pushToNative();
-      await markUnlocked(UnlockMethod.recoveryKey, then: then);
+      // The key was just used, so the offer to create one is moot.
+      _open(UnlockMethod.recoveryKey);
     }
     return result;
   }
 
   /// Whether [changePin] may skip the current PIN: the session was opened
   /// with a fingerprint, which is confirmed again at change time.
-  bool get canChangePinWithBiometric =>
-      _unlockedWith == UnlockMethod.biometric;
+  bool get canChangePinWithBiometric => _unlockedWith == UnlockMethod.biometric;
 
   /// Changes the PIN. Proof is [oldPin], or — when [canChangePinWithBiometric]
   /// and [oldPin] is null — a fresh fingerprint. Pushes the new verifier to
@@ -129,8 +153,7 @@ final class SessionNotifier extends Notifier<AuthStatus> {
 
   Future<void> lock() async {
     _unlockedWith = null;
-    final hasPin = await ref.read(pinAuthServiceProvider).hasPin();
-    state = hasPin ? AuthStatus.locked : AuthStatus.needsSetup;
+    await _resolve();
   }
 }
 

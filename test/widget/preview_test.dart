@@ -31,8 +31,8 @@ import '../helpers/fakes.dart';
 /// review only; it asserts nothing.
 final String? _gallery = Platform.environment['GALLERY'];
 
-/// A 96px launcher-style icon (colored squircle with a white disc), matching
-/// the PNGs the native side sends, so previews show what real icons look like.
+/// A launcher-style icon (colored squircle with a white disc), like the PNGs
+/// native caches, so previews show what real icons look like.
 Future<Uint8List> _fakeIcon(Color color) async {
   const size = 96.0;
   final recorder = ui.PictureRecorder();
@@ -104,8 +104,14 @@ void main() {
           'com.spotify.music': await _fakeIcon(const Color(0xFF1DB954)),
           'com.android.chrome': await _fakeIcon(const Color(0xFF4285F4)),
         });
+    final iconDir = Directory.systemTemp.createTempSync('openlock_icons');
+    addTearDown(() => iconDir.deleteSync(recursive: true));
+    final iconPaths = {
+      for (final MapEntry(:key, :value) in icons!.entries)
+        key: (File('${iconDir.path}/$key.png')..writeAsBytesSync(value)).path,
+    };
     InstalledApp app(String pkg, String label) =>
-        InstalledApp(packageName: pkg, label: label, icon: icons![pkg]);
+        InstalledApp(packageName: pkg, label: label, versionCode: 1);
 
     final bridge = FakeEnforcementBridge(
       apps: [
@@ -125,7 +131,9 @@ void main() {
         batteryExempt: false,
         serviceRunning: false,
       ),
-    )..records.addAll([
+    )
+      ..iconPaths = iconPaths
+      ..records.addAll([
         IntruderRecord(
           id: '1',
           packageName: 'com.whatsapp',
@@ -222,6 +230,10 @@ void main() {
           ),
         );
         await tester.pump(const Duration(milliseconds: 300));
+        // Icon files decode on real I/O, outside the fake clock.
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 200)),
+        );
         await tester.pump(const Duration(milliseconds: 300));
         await tester.runAsync(() async {
           final boundary =

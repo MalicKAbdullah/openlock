@@ -6,32 +6,51 @@ import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.os.Process
+import android.os.SystemClock
 import android.provider.Settings
-import android.util.Base64
+import android.util.Log
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.pm.PackageInfoCompat
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
-import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.FileOutputStream
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 
 /**
  * Handles the `openlock/enforcement` MethodChannel: config push, installed-app
  * enumeration, permission checks/requests, service control, and the intruder
  * log. Everything here is local to the device.
+ *
+ * PackageManager queries, icon rendering and the encrypted store run off the
+ * main thread so they never hold up a Flutter frame; replies are posted back
+ * to the main thread, where MethodChannel results must be delivered.
  */
 class EnforcementPlugin(private val activity: Activity) :
     MethodChannel.MethodCallHandler {
 
     private var channel: MethodChannel? = null
-    private val store = ConfigStore(activity)
+    private val store: ConfigStore by lazy { ConfigStore.get(activity) }
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    /** Serial, so config pushes and intruder-log edits apply in call order. */
+    private val storeExecutor: ExecutorService = Executors.newSingleThreadExecutor()
+
+    /** App list and icon rendering; independent requests, so two workers. */
+    private val appsExecutor: ExecutorService = Executors.newFixedThreadPool(2)
 
     fun register(messenger: BinaryMessenger) {
         channel = MethodChannel(messenger, CHANNEL).also {
@@ -42,16 +61,40 @@ class EnforcementPlugin(private val activity: Activity) :
     fun dispose() {
         channel?.setMethodCallHandler(null)
         channel = null
+        storeExecutor.shutdown()
+        appsExecutor.shutdown()
+    }
+
+    /** Runs [work] on [executor] and delivers its value (or error) on the main thread. */
+    private fun <T> replyFrom(
+        executor: ExecutorService,
+        result: MethodChannel.Result,
+        work: () -> T,
+    ) {
+        executor.execute {
+            try {
+                val value = work()
+                mainHandler.post { result.success(value) }
+            } catch (e: Exception) {
+                mainHandler.post { result.error("native_error", e.message, null) }
+            }
+        }
     }
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
             "pushConfig" -> {
                 val config = call.argument<String>("config")
-                if (config != null) store.saveConfig(config)
-                result.success(null)
+                replyFrom(storeExecutor, result) {
+                    if (config != null) store.saveConfig(config)
+                    null
+                }
             }
-            "getInstalledApps" -> result.success(installedApps())
+            "getInstalledApps" -> replyFrom(appsExecutor, result) { installedApps() }
+            "getAppIcons" -> {
+                val apps = call.argument<List<Map<String, Any?>>>("apps").orEmpty()
+                replyFrom(appsExecutor, result) { appIcons(apps) }
+            }
             "getPermissionStates" -> result.success(permissionStates())
             "requestUsageAccess" -> {
                 launch(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
@@ -96,14 +139,18 @@ class EnforcementPlugin(private val activity: Activity) :
                 deactivateDeviceAdmin()
                 result.success(null)
             }
-            "getIntruderRecords" -> result.success(store.intruderRecords())
+            "getIntruderRecords" ->
+                replyFrom(storeExecutor, result) { store.intruderRecords() }
             "deleteIntruderRecord" -> {
-                call.argument<String>("id")?.let { store.deleteIntruder(it) }
-                result.success(null)
+                val id = call.argument<String>("id")
+                replyFrom(storeExecutor, result) {
+                    id?.let { store.deleteIntruder(it) }
+                    null
+                }
             }
-            "clearIntruderRecords" -> {
+            "clearIntruderRecords" -> replyFrom(storeExecutor, result) {
                 store.clearIntruders()
-                result.success(null)
+                null
             }
             else -> result.notImplemented()
         }
@@ -111,7 +158,12 @@ class EnforcementPlugin(private val activity: Activity) :
 
     // --- Installed apps -----------------------------------------------------
 
+    /**
+     * Launchable apps as metadata only (no icons), sorted by label. The
+     * version code keys each app's icon in the disk cache.
+     */
     private fun installedApps(): List<Map<String, Any?>> {
+        val started = SystemClock.elapsedRealtime()
         val pm = activity.packageManager
         val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
         val resolveInfos = pm.queryIntentActivities(intent, 0)
@@ -121,16 +173,75 @@ class EnforcementPlugin(private val activity: Activity) :
             val pkg = info.activityInfo?.packageName ?: continue
             if (pkg == activity.packageName) continue
             if (!seen.add(pkg)) continue
+            // Uninstalled since the launcher query: not an installed app.
+            val packageInfo = try {
+                pm.getPackageInfo(pkg, 0)
+            } catch (e: PackageManager.NameNotFoundException) {
+                continue
+            }
             val label = info.loadLabel(pm)?.toString() ?: pkg
-            val icon = runCatching { drawableToBase64(info.loadIcon(pm)) }.getOrNull()
-            apps.add(mapOf("packageName" to pkg, "label" to label, "icon" to icon))
+            apps.add(
+                mapOf(
+                    "packageName" to pkg,
+                    "label" to label,
+                    "versionCode" to PackageInfoCompat.getLongVersionCode(packageInfo),
+                ),
+            )
         }
         apps.sortWith(compareBy { (it["label"] as? String)?.lowercase() ?: "" })
+        if (BuildConfig.DEBUG) {
+            Log.d(
+                TAG,
+                "installedApps: ${apps.size} apps in " +
+                    "${SystemClock.elapsedRealtime() - started} ms",
+            )
+        }
         return apps
     }
 
-    private fun drawableToBase64(drawable: Drawable?): String? {
-        if (drawable == null) return null
+    /**
+     * Icon PNG paths for [apps] (`packageName`, `versionCode`), rendering any
+     * not yet in the disk cache. A package without a loadable icon maps to
+     * null. Older cached versions of a re-rendered package are deleted.
+     */
+    private fun appIcons(apps: List<Map<String, Any?>>): Map<String, String?> {
+        val started = SystemClock.elapsedRealtime()
+        val dir = File(activity.cacheDir, ICON_DIR).apply { mkdirs() }
+        val cached = dir.list()?.toHashSet() ?: HashSet()
+        val pm = activity.packageManager
+        val paths = HashMap<String, String?>(apps.size)
+        var misses = 0
+        for (app in apps) {
+            val pkg = app["packageName"] as String
+            val version = (app["versionCode"] as Number).toLong()
+            val name = "$pkg@$version.png"
+            val file = File(dir, name)
+            if (name in cached) {
+                paths[pkg] = file.path
+                continue
+            }
+            misses++
+            paths[pkg] = runCatching {
+                renderIcon(pm.getApplicationIcon(pkg), file)
+                // Package names never contain '@', so the prefix matches only
+                // this package's earlier versions.
+                cached.filter { it.startsWith("$pkg@") }
+                    .forEach { File(dir, it).delete() }
+                file.path
+            }.getOrNull()
+        }
+        if (BuildConfig.DEBUG) {
+            Log.d(
+                TAG,
+                "appIcons: ${apps.size} requested, ${apps.size - misses} cached, " +
+                    "$misses rendered in ${SystemClock.elapsedRealtime() - started} ms",
+            )
+        }
+        return paths
+    }
+
+    /** Draws [drawable] at [ICON_SIZE_PX] and writes it to [target] atomically. */
+    private fun renderIcon(drawable: Drawable, target: File) {
         val size = ICON_SIZE_PX
         val bitmap = if (drawable is BitmapDrawable && drawable.bitmap != null) {
             Bitmap.createScaledBitmap(drawable.bitmap, size, size, true)
@@ -141,9 +252,13 @@ class EnforcementPlugin(private val activity: Activity) :
             drawable.draw(canvas)
             bmp
         }
-        val stream = ByteArrayOutputStream()
-        bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
-        return Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP)
+        // A reader must never see a half-written PNG under the final name.
+        val partial = File(target.parentFile, "${target.name}.part")
+        FileOutputStream(partial).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        if (!partial.renameTo(target)) {
+            partial.delete()
+            error("could not move icon into place for ${target.name}")
+        }
     }
 
     // --- Permissions --------------------------------------------------------
@@ -283,7 +398,11 @@ class EnforcementPlugin(private val activity: Activity) :
 
     companion object {
         private const val CHANNEL = "openlock/enforcement"
-        private const val ICON_SIZE_PX = 96
+        private const val TAG = "OpenLockPerf"
+        private const val ICON_DIR = "app_icons"
+
+        /** 40 dp at up to ~3.6x density, the largest the app list draws. */
+        private const val ICON_SIZE_PX = 144
         private const val REQ_NOTIFICATIONS = 9021
     }
 }

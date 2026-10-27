@@ -31,6 +31,11 @@ android {
         jvmTarget = JavaVersion.VERSION_17.toString()
     }
 
+    buildFeatures {
+        // BuildConfig.DEBUG gates the native timing logs.
+        buildConfig = true
+    }
+
     defaultConfig {
         applicationId = "dev.abdullah.openlock"
         // EncryptedSharedPreferences (AndroidKeyStore AES) needs API 23+.

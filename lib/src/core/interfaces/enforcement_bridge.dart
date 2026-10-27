@@ -1,19 +1,24 @@
-import 'dart:typed_data';
-
 /// A launchable app installed on the device, as reported by the native
-/// PackageManager query.
+/// PackageManager query. Metadata only: the icon is fetched separately, per
+/// visible row, through [IEnforcementBridge.getAppIcons].
 final class InstalledApp {
-  const InstalledApp({
+  InstalledApp({
     required this.packageName,
     required this.label,
-    this.icon,
-  });
+    required this.versionCode,
+  })  : labelKey = label.toLowerCase(),
+        packageKey = packageName.toLowerCase();
 
   final String packageName;
   final String label;
 
-  /// PNG bytes of the launcher icon, or null when unavailable.
-  final Uint8List? icon;
+  /// The installed build; it keys the cached icon, so an update re-renders it.
+  final int versionCode;
+
+  /// [label] and [packageName] lower-cased once, for case-insensitive sorting
+  /// and search without lower-casing inside every comparison.
+  final String labelKey;
+  final String packageKey;
 }
 
 /// Snapshot of the special-access permissions the enforcement service needs.
@@ -105,8 +110,13 @@ abstract interface class IEnforcementBridge {
   Future<void> pushConfig(Map<String, dynamic> config);
 
   /// The list of launchable apps (excluding OpenLock and launcher-less system
-  /// apps) for the app picker.
+  /// apps) for the app picker, without icons.
   Future<List<InstalledApp>> getInstalledApps();
+
+  /// Paths of launcher-icon PNGs for [apps], keyed by package name; null for
+  /// a package that has no loadable icon. Native renders an icon into its
+  /// disk cache the first time a version is requested.
+  Future<Map<String, String?>> getAppIcons(List<InstalledApp> apps);
 
   Future<PermissionStates> getPermissionStates();
 

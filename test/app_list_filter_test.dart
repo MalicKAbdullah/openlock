@@ -3,10 +3,10 @@ import 'package:openlock/src/core/interfaces/enforcement_bridge.dart';
 import 'package:openlock/src/features/apps/services/app_list_filter.dart';
 
 void main() {
-  const apps = [
-    InstalledApp(packageName: 'com.zeta.chat', label: 'Zeta'),
-    InstalledApp(packageName: 'com.alpha.mail', label: 'Alpha'),
-    InstalledApp(packageName: 'com.beta.game', label: 'beta'),
+  final apps = [
+    InstalledApp(packageName: 'com.zeta.chat', label: 'Zeta', versionCode: 1),
+    InstalledApp(packageName: 'com.alpha.mail', label: 'Alpha', versionCode: 1),
+    InstalledApp(packageName: 'com.beta.game', label: 'beta', versionCode: 1),
   ];
 
   test('sorts locked apps first, then case-insensitively by label', () {

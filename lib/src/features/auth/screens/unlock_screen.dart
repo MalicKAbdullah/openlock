@@ -65,12 +65,10 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen> {
   }
 
   Future<void> _tryBiometric() async {
-    final biometric = ref.read(biometricServiceProvider);
-    if (!await biometric.isEnabled()) return;
-    if (await biometric.authenticate()) {
-      await ref
-          .read(sessionProvider.notifier)
-          .markUnlocked(UnlockMethod.biometric, then: AppRoutes.apps);
+    final session = ref.read(sessionProvider.notifier);
+    if (!session.biometricEnabled) return;
+    if (await ref.read(biometricServiceProvider).authenticate()) {
+      session.markUnlocked(UnlockMethod.biometric, then: AppRoutes.apps);
     }
   }
 
@@ -81,7 +79,7 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen> {
       case UnlockSuccess():
         // Re-push config in case anything changed while locked.
         unawaited(ref.read(configControllerProvider.notifier).pushToNative());
-        await ref
+        ref
             .read(sessionProvider.notifier)
             .markUnlocked(UnlockMethod.pin, then: AppRoutes.apps);
       case UnlockWrongPin(:final cooldown):
@@ -236,7 +234,6 @@ class _RecoveryFormState extends ConsumerState<_RecoveryForm> {
     final result = await ref.read(sessionProvider.notifier).recover(
           recoveryKey: _key.text,
           newPin: _pin.text,
-          then: AppRoutes.apps,
         );
     if (!mounted) return;
     setState(() => _busy = false);

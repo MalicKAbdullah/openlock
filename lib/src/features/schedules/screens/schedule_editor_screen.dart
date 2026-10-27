@@ -174,8 +174,8 @@ class _ScheduleEditorScreenState extends ConsumerState<ScheduleEditorScreen> {
                 title: 'Could not load apps',
               ),
               data: (apps) {
-                final sorted = [...apps]..sort((a, b) =>
-                    a.label.toLowerCase().compareTo(b.label.toLowerCase()));
+                final sorted = [...apps]
+                  ..sort((a, b) => a.labelKey.compareTo(b.labelKey));
                 void toggle(String pkg) => setState(() {
                       if (!_packages.add(pkg)) _packages.remove(pkg);
                     });

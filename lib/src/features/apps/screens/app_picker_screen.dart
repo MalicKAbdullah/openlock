@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:core_theme/core_theme.dart';
 import 'package:core_ui/core_ui.dart';
 import 'package:core_update/core_update.dart';
@@ -7,7 +9,6 @@ import 'package:openlock/src/core/di.dart';
 import 'package:openlock/src/core/interfaces/enforcement_bridge.dart';
 import 'package:openlock/src/core/widgets/screen_header.dart';
 import 'package:openlock/src/features/apps/providers/apps_providers.dart';
-import 'package:openlock/src/features/apps/services/app_list_filter.dart';
 import 'package:openlock/src/features/enforcement/models/lock_config.dart';
 import 'package:openlock/src/features/enforcement/models/relock_policy.dart';
 import 'package:openlock/src/features/enforcement/providers/config_providers.dart';
@@ -16,84 +17,90 @@ import 'package:openlock/src/features/intruder/providers/intruder_providers.dart
 class AppPickerScreen extends ConsumerWidget {
   const AppPickerScreen({super.key});
 
+  /// Rows shown while the installed apps load; enough to fill the screen
+  /// below the header.
+  static const _skeletonRows = 8;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final appsAsync = ref.watch(installedAppsProvider);
-    final configAsync = ref.watch(configControllerProvider);
-    final query = ref.watch(appSearchQueryProvider);
-    final config = configAsync.valueOrNull ?? LockConfig.empty;
+    final list = ref.watch(appListProvider);
+    final config =
+        ref.watch(configControllerProvider).valueOrNull ?? LockConfig.empty;
+    final view = list.valueOrNull;
+    final rowCount = switch (list) {
+      AsyncData(:final value) =>
+        value.visible.isEmpty ? 1 : value.visible.length,
+      AsyncError() => 1,
+      _ => _skeletonRows,
+    };
 
     return Scaffold(
       body: SafeArea(
         bottom: false,
-        child: appsAsync.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (_, __) => const AppEmptyState(
-            icon: Icons.error_outline_rounded,
-            title: 'Could not load apps',
-            message: 'The list of installed apps is unavailable right now.',
-          ),
-          data: (apps) {
-            final visible = AppListFilter.apply(
-              apps: apps,
-              lockedPackages: config.lockedPackages,
-              query: query,
-            );
-            final lockedCount = AppListFilter.lockedCount(
-              apps: apps,
-              lockedPackages: config.lockedPackages,
-            );
-            return Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 640),
-                child: ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.gutter,
-                    AppSpacing.md,
-                    AppSpacing.gutter,
-                    AppSpacing.xl,
-                  ),
-                  // Header blocks first, then one lazily built row per app.
-                  itemCount:
-                      _headerCount + (visible.isEmpty ? 1 : visible.length),
-                  itemBuilder: (context, index) {
-                    if (index < _headerCount) {
-                      return _header(
-                        context,
-                        ref,
-                        index,
-                        config: config,
-                        total: apps.length,
-                        lockedCount: lockedCount,
-                        shown: visible.length,
-                      );
-                    }
-                    if (visible.isEmpty) {
-                      return const AppEmptyState(
-                        compact: true,
-                        icon: Icons.search_off_rounded,
-                        title: 'No apps match',
-                        message: 'Try a different name.',
-                      );
-                    }
-                    final i = index - _headerCount;
-                    final app = visible[i];
-                    return GroupedRowItem(
-                      isFirst: i == 0,
-                      isLast: i == visible.length - 1,
-                      child: _AppTile(
-                        app: app,
-                        config: config,
-                        onToggle: () => ref
-                            .read(configControllerProvider.notifier)
-                            .toggleApp(app.packageName),
-                      ),
-                    );
-                  },
-                ),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 640),
+            child: ListView.builder(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.gutter,
+                AppSpacing.md,
+                AppSpacing.gutter,
+                AppSpacing.xl,
               ),
-            );
-          },
+              // Header blocks first, then one lazily built row per app. The
+              // header never waits for the app list; only the rows do.
+              itemCount: _headerCount + rowCount,
+              itemBuilder: (context, index) {
+                if (index < _headerCount) {
+                  return _header(
+                    context,
+                    ref,
+                    index,
+                    config: config,
+                    total: view?.total,
+                    lockedCount: view?.lockedCount,
+                  );
+                }
+                final i = index - _headerCount;
+                if (list.hasError) {
+                  return const AppEmptyState(
+                    compact: true,
+                    icon: Icons.error_outline_rounded,
+                    title: 'Could not load apps',
+                    message:
+                        'The list of installed apps is unavailable right now.',
+                  );
+                }
+                if (view == null) {
+                  return GroupedRowItem(
+                    isFirst: i == 0,
+                    isLast: i == rowCount - 1,
+                    child: const _AppTileSkeleton(),
+                  );
+                }
+                if (view.visible.isEmpty) {
+                  return const AppEmptyState(
+                    compact: true,
+                    icon: Icons.search_off_rounded,
+                    title: 'No apps match',
+                    message: 'Try a different name.',
+                  );
+                }
+                final app = view.visible[i];
+                return GroupedRowItem(
+                  isFirst: i == 0,
+                  isLast: i == view.visible.length - 1,
+                  child: _AppTile(
+                    app: app,
+                    config: config,
+                    onToggle: () => ref
+                        .read(configControllerProvider.notifier)
+                        .toggleApp(app.packageName),
+                  ),
+                );
+              },
+            ),
+          ),
         ),
       ),
     );
@@ -106,9 +113,8 @@ class AppPickerScreen extends ConsumerWidget {
     WidgetRef ref,
     int index, {
     required LockConfig config,
-    required int total,
-    required int lockedCount,
-    required int shown,
+    required int? total,
+    required int? lockedCount,
   }) {
     switch (index) {
       case 0:
@@ -151,7 +157,7 @@ class AppPickerScreen extends ConsumerWidget {
             AppSpacing.sm,
           ),
           child: Text(
-            '$lockedCount locked',
+            lockedCount == null ? '' : '$lockedCount locked',
             style: AppTextStyles.label.copyWith(
               color: SuiteColors.of(context).textSecondary,
             ),
@@ -171,23 +177,28 @@ class _ProtectionHero extends ConsumerWidget {
   });
 
   final LockConfig config;
-  final int lockedCount;
-  final int total;
+
+  /// Null until the installed apps have loaded.
+  final int? lockedCount;
+  final int? total;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final c = SuiteColors.of(context);
     final intruders = ref.watch(intruderControllerProvider).valueOrNull;
     final activeSchedules = config.schedules.where((s) => s.enabled).length;
-    final guarded = lockedCount > 0;
+    // Until the app list arrives, the configured set is the best answer.
+    final guarded = (lockedCount ?? config.lockedPackages.length) > 0;
     return HeroMetricCard(
       label: 'Protected apps',
       trailing: _GuardPill(guarded: guarded),
       value: ValueText(
-        '$lockedCount',
+        lockedCount == null ? '-' : '$lockedCount',
         style: AppTextStyles.hero.copyWith(color: c.textPrimary),
       ),
-      deltaCaption: 'of $total installed apps',
+      deltaCaption: total == null
+          ? 'Counting installed apps'
+          : 'of $total installed apps',
       footer: [
         StatTile(label: 'Schedules', value: '$activeSchedules on'),
         StatTile(
@@ -286,20 +297,7 @@ class _AppTile extends ConsumerWidget {
       children: [
         AppListRow(
           onTap: onToggle,
-          leading: SizedBox(
-            width: 40,
-            height: 40,
-            child: app.icon != null
-                ? Image.memory(
-                    app.icon!,
-                    gaplessPlayback: true,
-                    // Icons arrive as 96px PNGs; decode at that size (not full
-                    // resolution) to keep the scrolling list light.
-                    cacheWidth: 96,
-                    cacheHeight: 96,
-                  )
-                : Icon(Icons.android, color: c.textSecondary),
-          ),
+          leading: _AppIcon(app: app),
           title: app.label,
           subtitle: app.packageName,
           trailing: Switch(value: locked, onChanged: (_) => onToggle()),
@@ -336,6 +334,94 @@ class _AppTile extends ConsumerWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+/// An [_AppTile] while the installed apps load: built from the same row so
+/// it has exactly the same height, with the text left blank.
+class _AppTileSkeleton extends StatelessWidget {
+  const _AppTileSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return const AppListRow(
+      leading: Skeleton(width: _iconSize, height: _iconSize, radius: 12),
+      title: '',
+      subtitle: '',
+      trailing: Visibility(
+        visible: false,
+        maintainSize: true,
+        maintainAnimation: true,
+        maintainState: true,
+        child: Switch(value: false, onChanged: null),
+      ),
+    );
+  }
+}
+
+const double _iconSize = 40;
+
+/// A row's launcher icon, loaded from native's disk cache once the row is
+/// built. A same-size placeholder holds the space until it is decoded.
+class _AppIcon extends ConsumerWidget {
+  const _AppIcon({required this.app});
+
+  final InstalledApp app;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final loader = ref.watch(appIconLoaderProvider);
+    if (loader.isResolved(app)) return _icon(context, loader.resolvedPath(app));
+    return FutureBuilder<String?>(
+      future: loader.pathFor(app),
+      builder: (context, snapshot) => switch (snapshot) {
+        AsyncSnapshot(hasError: true) => _icon(context, null),
+        AsyncSnapshot(connectionState: ConnectionState.done) =>
+          _icon(context, snapshot.data),
+        _ => const _IconPlaceholder(),
+      },
+    );
+  }
+
+  Widget _icon(BuildContext context, String? path) {
+    if (path == null) {
+      return SizedBox.square(
+        dimension: _iconSize,
+        child:
+            Icon(Icons.android, color: SuiteColors.of(context).textSecondary),
+      );
+    }
+    // Decode straight to the drawn size; decoding runs off the UI thread.
+    final px = (_iconSize * MediaQuery.devicePixelRatioOf(context)).round();
+    return Image.file(
+      File(path),
+      width: _iconSize,
+      height: _iconSize,
+      cacheWidth: px,
+      cacheHeight: px,
+      gaplessPlayback: true,
+      frameBuilder: (context, child, frame, sync) =>
+          sync || frame != null ? child : const _IconPlaceholder(),
+      // The OS may clear the cache directory while the app is running.
+      errorBuilder: (context, _, __) => _icon(context, null),
+    );
+  }
+}
+
+class _IconPlaceholder extends StatelessWidget {
+  const _IconPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox.square(
+      dimension: _iconSize,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: SuiteColors.of(context).surfaceAlt,
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
     );
   }
 }

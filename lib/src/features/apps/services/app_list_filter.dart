@@ -15,16 +15,14 @@ abstract final class AppListFilter {
     final filtered = q.isEmpty
         ? List<InstalledApp>.of(apps)
         : apps
-            .where((a) =>
-                a.label.toLowerCase().contains(q) ||
-                a.packageName.toLowerCase().contains(q))
+            .where((a) => a.labelKey.contains(q) || a.packageKey.contains(q))
             .toList();
 
     filtered.sort((a, b) {
       final aLocked = lockedPackages.contains(a.packageName);
       final bLocked = lockedPackages.contains(b.packageName);
       if (aLocked != bLocked) return aLocked ? -1 : 1;
-      final byLabel = a.label.toLowerCase().compareTo(b.label.toLowerCase());
+      final byLabel = a.labelKey.compareTo(b.labelKey);
       if (byLabel != 0) return byLabel;
       return a.packageName.compareTo(b.packageName);
     });
