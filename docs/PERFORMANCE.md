@@ -42,8 +42,8 @@ OpenLock qualifies for `CachedSecureStorage`:
   `pushConfig` and the intruder-log calls on a serial one (so pushes apply in
   order). Replies are posted back to the main thread.
 - `ConfigStore` is one process-wide instance (`ConfigStore.get`), created on
-  first use: the monitor service, the lock overlay and the plugin share one
-  EncryptedSharedPreferences build. The parsed config is cached and replaced
+  first use: the monitor service, the notification listener, the lock overlay
+  and the plugin share one EncryptedSharedPreferences build. The parsed config is cached and replaced
   by `saveConfig`, the only writer.
 
 ## Measured (Dart)

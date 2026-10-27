@@ -16,8 +16,8 @@ import java.util.UUID
  *
  * One instance per process ([get]): building EncryptedSharedPreferences
  * (MasterKey lookup + Tink keyset decrypts through the Keystore) is the
- * expensive part, and the monitor service, the lock overlay and the Flutter
- * plugin all run in this process. Because every write to the prefs file goes
+ * expensive part, and the monitor service, the notification listener, the
+ * lock overlay and the Flutter plugin all run in this process. Because every write to the prefs file goes
  * through this instance, the parsed config can be cached and replaced on
  * [saveConfig].
  */
