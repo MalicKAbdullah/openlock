@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -114,6 +115,24 @@ void main() {
       for (final MapEntry(:key, :value) in icons!.entries)
         key: (File('${iconDir.path}/$key.png')..writeAsBytesSync(value)).path,
     };
+    // The rows draw Image.file decoded at 40 dp @2x. File reads and decodes
+    // started under the fake clock never complete, so the icons are decoded
+    // into the image cache in real time first and every row finds its icon
+    // there.
+    await tester.runAsync(() async {
+      for (final path in iconPaths.values) {
+        final done = Completer<void>();
+        ResizeImage(FileImage(File(path)), width: 80, height: 80)
+            .resolve(ImageConfiguration.empty)
+            .addListener(
+              ImageStreamListener(
+                (_, __) => done.complete(),
+                onError: done.completeError,
+              ),
+            );
+        await done.future;
+      }
+    });
     InstalledApp app(String pkg, String label) =>
         InstalledApp(packageName: pkg, label: label, versionCode: 1);
 
@@ -379,10 +398,6 @@ Future<void> _shoot(
     ),
   );
   await tester.pump(const Duration(milliseconds: 300));
-  // Icon files decode on real I/O, outside the fake clock.
-  await tester.runAsync(
-    () => Future<void>.delayed(const Duration(milliseconds: 200)),
-  );
   await tester.pump(const Duration(milliseconds: 300));
   await tester.pump(const Duration(milliseconds: 300));
   if (then != null) {
