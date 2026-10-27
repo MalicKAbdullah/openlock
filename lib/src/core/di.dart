@@ -1,5 +1,6 @@
 import 'package:core_crypto/core_crypto.dart';
 import 'package:core_storage/core_storage.dart';
+import 'package:core_theme/core_theme.dart';
 import 'package:core_update/core_update.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -19,6 +20,13 @@ import 'package:openlock/src/features/enforcement/services/config_repository.dar
 /// Composition root. Tests override the leaf providers (storage, file store,
 /// clock, biometrics, enforcement bridge) with in-memory fakes — no platform
 /// channels.
+/// The System/Light/Dark choice, loaded before `runApp` so the first frame
+/// (the lock screen included) already has the right theme. `main` overrides
+/// it with the loaded controller.
+final appearanceProvider = Provider<AppearanceController>(
+  (_) => throw UnimplementedError('appearanceProvider is overridden in main'),
+);
+
 final clockProvider = Provider<Clock>((_) => const SystemClock());
 
 final secureStorageProvider = Provider<ISecureStorage>(
