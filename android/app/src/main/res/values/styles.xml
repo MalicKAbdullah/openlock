@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Theme applied to the Android Window while the process is starting when the OS's Dark Mode setting is off -->
     <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
         <!-- Show a splash screen on the activity. Automatically removed when
@@ -19,11 +19,14 @@
     <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
         <item name="android:windowBackground">?android:colorBackground</item>
     </style>
-    <!-- The native on-top lock screen: opaque dark, no action bar. -->
-    <style name="LockTheme" parent="@android:style/Theme.Material.NoActionBar">
+    <!-- The native on-top lock screen: opaque, no action bar, LockPalette's
+         background for the device night mode (values-night overrides). -->
+    <style name="LockTheme" parent="@android:style/Theme.Material.Light.NoActionBar">
         <item name="android:windowBackground">@color/lockBackground</item>
         <item name="android:statusBarColor">@color/lockBackground</item>
         <item name="android:navigationBarColor">@color/lockBackground</item>
         <item name="android:windowNoTitle">true</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="27">true</item>
     </style>
 </resources>

@@ -36,6 +36,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.fragment.app.FragmentActivity
+import java.security.SecureRandom
 
 /**
  * The on-top lock screen shown over a locked app. Native (not Flutter) so it
@@ -88,6 +89,13 @@ class LockActivity : FragmentActivity() {
         store = ConfigStore.get(this)
         lockedPackage = intent.getStringExtra(EXTRA_PACKAGE).orEmpty()
 
+        // LockTheme's window background follows the device night mode; a
+        // forced Light/Dark appearance can differ, so the window takes the
+        // resolved palette before any content is set and the first frame
+        // never shows the other mode's background.
+        palette = LockPalette.resolve(this)
+        applyWindowColors()
+
         if (store.fakeCoverEnabled()) {
             setContentView(buildDecoyView())
         } else {
@@ -105,11 +113,9 @@ class LockActivity : FragmentActivity() {
 
     /** Swaps in the real PIN screen and kicks off the biometric prompt. */
     private fun showRealLock() {
-        palette = LockPalette.resolve(this)
         regular = ResourcesCompat.getFont(this, R.font.mona_sans_regular)!!
         medium = ResourcesCompat.getFont(this, R.font.mona_sans_medium)!!
         semiBold = ResourcesCompat.getFont(this, R.font.mona_sans_semibold)!!
-        applyWindowColors()
         setContentView(buildLockView())
         realLockShown = true
         triggerBiometric()
@@ -239,7 +245,7 @@ class LockActivity : FragmentActivity() {
 
     private fun buildKeypad(): View {
         val digits = (0..9).map { it.toString() }.toMutableList()
-        if (store.randomizeKeypad()) digits.shuffle()
+        if (store.randomizeKeypad()) digits.shuffle(SecureRandom())
 
         val grid = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         fun row(cells: List<View>, last: Boolean) {
