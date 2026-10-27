@@ -56,7 +56,7 @@ class OpenLockMonitorService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        store = ConfigStore(this)
+        store = ConfigStore.get(this)
         usageStatsManager = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
         registerReceiver(screenReceiver, IntentFilter(Intent.ACTION_SCREEN_OFF))
     }

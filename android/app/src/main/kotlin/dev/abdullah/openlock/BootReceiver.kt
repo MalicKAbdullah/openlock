@@ -15,7 +15,7 @@ class BootReceiver : BroadcastReceiver() {
             return
         }
 
-        val store = ConfigStore(context)
+        val store = ConfigStore.get(context)
         val hasWork = store.lockedPackages().isNotEmpty() || store.schedules().length() > 0
         if (store.pinHash() == null || !hasWork) return
 

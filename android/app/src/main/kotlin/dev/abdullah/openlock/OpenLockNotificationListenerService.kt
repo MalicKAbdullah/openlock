@@ -40,7 +40,7 @@ class OpenLockNotificationListenerService : NotificationListenerService() {
 
     override fun onCreate() {
         super.onCreate()
-        store = ConfigStore(this)
+        store = ConfigStore.get(this)
         instance = this
         ensureChannel()
     }

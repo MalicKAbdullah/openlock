@@ -13,10 +13,20 @@ import java.util.UUID
  * stored in EncryptedSharedPreferences (androidx.security.crypto). The Flutter
  * app is the source of truth and pushes the enforcement subset here via the
  * MethodChannel; the service only ever reads it.
+ *
+ * One instance per process ([get]): building EncryptedSharedPreferences
+ * (MasterKey lookup + Tink keyset decrypts through the Keystore) is the
+ * expensive part, and the monitor service, the lock overlay and the Flutter
+ * plugin all run in this process. Because every write to the prefs file goes
+ * through this instance, the parsed config can be cached and replaced on
+ * [saveConfig].
  */
-class ConfigStore(context: Context) {
+class ConfigStore private constructor(context: Context) {
 
-    private val prefs: SharedPreferences = createPrefs(context.applicationContext)
+    private val prefs: SharedPreferences = createPrefs(context)
+
+    @Volatile
+    private var config: JSONObject? = parse(prefs.getString(KEY_CONFIG, null))
 
     private fun createPrefs(context: Context): SharedPreferences {
         return try {
@@ -39,10 +49,11 @@ class ConfigStore(context: Context) {
 
     fun saveConfig(json: String) {
         prefs.edit().putString(KEY_CONFIG, json).apply()
+        config = parse(json)
     }
 
-    private fun config(): JSONObject? {
-        val raw = prefs.getString(KEY_CONFIG, null) ?: return null
+    private fun parse(raw: String?): JSONObject? {
+        if (raw == null) return null
         return try {
             JSONObject(raw)
         } catch (e: Exception) {
@@ -50,38 +61,38 @@ class ConfigStore(context: Context) {
         }
     }
 
-    fun hasConfig(): Boolean = config() != null
+    fun hasConfig(): Boolean = config != null
 
     fun lockedPackages(): Set<String> {
-        val array = config()?.optJSONArray("lockedPackages") ?: return emptySet()
+        val array = config?.optJSONArray("lockedPackages") ?: return emptySet()
         val set = HashSet<String>(array.length())
         for (i in 0 until array.length()) set.add(array.optString(i))
         return set
     }
 
-    fun schedules(): JSONArray = config()?.optJSONArray("schedules") ?: JSONArray()
+    fun schedules(): JSONArray = config?.optJSONArray("schedules") ?: JSONArray()
 
-    fun relockMode(): String = config()?.optString("relockMode", "immediately") ?: "immediately"
+    fun relockMode(): String = config?.optString("relockMode", "immediately") ?: "immediately"
 
-    fun relockTimeoutMinutes(): Int = config()?.optInt("relockTimeoutMinutes", 1) ?: 1
+    fun relockTimeoutMinutes(): Int = config?.optInt("relockTimeoutMinutes", 1) ?: 1
 
-    fun randomizeKeypad(): Boolean = config()?.optBoolean("randomizeKeypad", false) ?: false
+    fun randomizeKeypad(): Boolean = config?.optBoolean("randomizeKeypad", false) ?: false
 
     fun intruderCaptureEnabled(): Boolean =
-        config()?.optBoolean("intruderCaptureEnabled", false) ?: false
+        config?.optBoolean("intruderCaptureEnabled", false) ?: false
 
-    fun intruderThreshold(): Int = config()?.optInt("intruderThreshold", 3) ?: 3
+    fun intruderThreshold(): Int = config?.optInt("intruderThreshold", 3) ?: 3
 
-    fun fakeCoverEnabled(): Boolean = config()?.optBoolean("fakeCoverEnabled", false) ?: false
+    fun fakeCoverEnabled(): Boolean = config?.optBoolean("fakeCoverEnabled", false) ?: false
 
-    fun preventUninstall(): Boolean = config()?.optBoolean("preventUninstall", false) ?: false
+    fun preventUninstall(): Boolean = config?.optBoolean("preventUninstall", false) ?: false
 
     /** Global default for hiding locked apps' notification content. */
-    fun hideNotifications(): Boolean = config()?.optBoolean("hideNotifications", false) ?: false
+    fun hideNotifications(): Boolean = config?.optBoolean("hideNotifications", false) ?: false
 
     /** Per-package explicit overrides of [hideNotifications]; package → on/off. */
     private fun notificationOverrides(): Map<String, Boolean> {
-        val obj = config()?.optJSONObject("notificationOverrides") ?: return emptyMap()
+        val obj = config?.optJSONObject("notificationOverrides") ?: return emptyMap()
         val map = HashMap<String, Boolean>(obj.length())
         val keys = obj.keys()
         while (keys.hasNext()) {
@@ -101,13 +112,13 @@ class ConfigStore(context: Context) {
         return notificationOverrides()[pkg] ?: hideNotifications()
     }
 
-    fun biometricEnabled(): Boolean = config()?.optBoolean("biometricEnabled", false) ?: false
+    fun biometricEnabled(): Boolean = config?.optBoolean("biometricEnabled", false) ?: false
 
-    fun pinHash(): String? = config()?.optString("pinHash")?.ifBlank { null }
+    fun pinHash(): String? = config?.optString("pinHash")?.ifBlank { null }
 
-    fun pinSalt(): String? = config()?.optString("pinSalt")?.ifBlank { null }
+    fun pinSalt(): String? = config?.optString("pinSalt")?.ifBlank { null }
 
-    fun pinIterations(): Int = config()?.optInt("pinIterations", 120000) ?: 120000
+    fun pinIterations(): Int = config?.optInt("pinIterations", 120000) ?: 120000
 
     // --- Intruder log -------------------------------------------------------
 
@@ -178,6 +189,14 @@ class ConfigStore(context: Context) {
     }
 
     companion object {
+        @Volatile
+        private var instance: ConfigStore? = null
+
+        fun get(context: Context): ConfigStore =
+            instance ?: synchronized(this) {
+                instance ?: ConfigStore(context.applicationContext).also { instance = it }
+            }
+
         private const val PREFS_NAME = "openlock_enforcement"
         private const val KEY_CONFIG = "config"
         private const val KEY_INTRUDERS = "intruders"
