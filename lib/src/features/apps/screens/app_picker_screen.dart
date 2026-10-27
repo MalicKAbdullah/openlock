@@ -83,7 +83,7 @@ class AppPickerScreen extends ConsumerWidget {
                       isLast: i == visible.length - 1,
                       child: _AppTile(
                         app: app,
-                        locked: config.lockedPackages.contains(app.packageName),
+                        config: config,
                         onToggle: () => ref
                             .read(configControllerProvider.notifier)
                             .toggleApp(app.packageName),
@@ -266,39 +266,76 @@ class _LockNewAppsTile extends ConsumerWidget {
   }
 }
 
-class _AppTile extends StatelessWidget {
+class _AppTile extends ConsumerWidget {
   const _AppTile({
     required this.app,
-    required this.locked,
+    required this.config,
     required this.onToggle,
   });
 
   final InstalledApp app;
-  final bool locked;
+  final LockConfig config;
   final VoidCallback onToggle;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final c = SuiteColors.of(context);
-    return AppListRow(
-      onTap: onToggle,
-      leading: SizedBox(
-        width: 40,
-        height: 40,
-        child: app.icon != null
-            ? Image.memory(
-                app.icon!,
-                gaplessPlayback: true,
-                // Icons arrive as 96px PNGs; decode at that size (not full
-                // resolution) to keep the scrolling list light.
-                cacheWidth: 96,
-                cacheHeight: 96,
-              )
-            : Icon(Icons.android, color: c.textSecondary),
-      ),
-      title: app.label,
-      subtitle: app.packageName,
-      trailing: Switch(value: locked, onChanged: (_) => onToggle()),
+    final locked = config.lockedPackages.contains(app.packageName);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        AppListRow(
+          onTap: onToggle,
+          leading: SizedBox(
+            width: 40,
+            height: 40,
+            child: app.icon != null
+                ? Image.memory(
+                    app.icon!,
+                    gaplessPlayback: true,
+                    // Icons arrive as 96px PNGs; decode at that size (not full
+                    // resolution) to keep the scrolling list light.
+                    cacheWidth: 96,
+                    cacheHeight: 96,
+                  )
+                : Icon(Icons.android, color: c.textSecondary),
+          ),
+          title: app.label,
+          subtitle: app.packageName,
+          trailing: Switch(value: locked, onChanged: (_) => onToggle()),
+        ),
+        // Per-app notification-hiding override, only meaningful once the app is
+        // locked. Reflects the effective choice (override, else the global
+        // default) and writes an explicit per-app override.
+        if (locked)
+          Padding(
+            padding: const EdgeInsets.only(left: 56, right: 4, bottom: 4),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.notifications_off_outlined,
+                  size: 18,
+                  color: c.textSecondary,
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Text(
+                    'Hide notifications',
+                    style: AppTextStyles.bodySmall.copyWith(
+                      color: c.textSecondary,
+                    ),
+                  ),
+                ),
+                Switch(
+                  value: config.hidesNotificationsFor(app.packageName),
+                  onChanged: (value) => ref
+                      .read(configControllerProvider.notifier)
+                      .setNotificationOverride(app.packageName, value),
+                ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 }

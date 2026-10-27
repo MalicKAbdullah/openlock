@@ -33,6 +33,7 @@ void main() {
         usageAccess: false,
         overlay: false,
         notifications: false,
+        notificationAccess: false,
         batteryExempt: false,
         serviceRunning: false,
       ),

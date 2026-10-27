@@ -69,6 +69,25 @@ final class ConfigController extends AsyncNotifier<LockConfig> {
     await _apply(config.copyWith(fakeCoverEnabled: value));
   }
 
+  /// Sets the global "hide notification content" default for locked apps.
+  Future<void> setHideNotifications(bool value) async {
+    final config = state.valueOrNull ?? LockConfig.empty;
+    await _apply(config.copyWith(hideNotifications: value));
+  }
+
+  /// Sets or clears a per-app notification-hiding override. Passing null
+  /// removes the override so the app follows the global flag again.
+  Future<void> setNotificationOverride(String packageName, bool? value) async {
+    final config = state.valueOrNull ?? LockConfig.empty;
+    final overrides = Map<String, bool>.of(config.notificationOverrides);
+    if (value == null) {
+      overrides.remove(packageName);
+    } else {
+      overrides[packageName] = value;
+    }
+    await _apply(config.copyWith(notificationOverrides: overrides));
+  }
+
   /// Persists the "prevent uninstall" intent and re-pushes it to the native
   /// monitor so it knows whether to guard the OS deactivate-admin / app-info /
   /// uninstall screens. Does NOT itself activate or deactivate device admin —

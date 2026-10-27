@@ -74,6 +74,10 @@ class EnforcementPlugin(private val activity: Activity) :
                 requestNotifications()
                 result.success(null)
             }
+            "requestNotificationAccess" -> {
+                launch(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                result.success(null)
+            }
             "isServiceRunning" -> result.success(OpenLockMonitorService.isRunning)
             "startService" -> {
                 startService()
@@ -148,9 +152,21 @@ class EnforcementPlugin(private val activity: Activity) :
         "usageAccess" to hasUsageAccess(),
         "overlay" to hasOverlay(),
         "notifications" to hasNotifications(),
+        "notificationAccess" to hasNotificationAccess(),
         "batteryExempt" to isBatteryExempt(),
         "serviceRunning" to OpenLockMonitorService.isRunning,
     )
+
+    /** Whether OpenLock holds notification-listener access (required to hide
+     *  locked apps' notification content). */
+    private fun hasNotificationAccess(): Boolean {
+        val flat = Settings.Secure.getString(
+            activity.contentResolver,
+            "enabled_notification_listeners",
+        ) ?: return false
+        val me = activity.packageName
+        return flat.split(':').any { it.startsWith("$me/") }
+    }
 
     private fun hasUsageAccess(): Boolean {
         return try {

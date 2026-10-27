@@ -17,6 +17,8 @@ void main() {
         intruderThreshold: 4,
         fakeCoverEnabled: true,
         preventUninstall: true,
+        hideNotifications: true,
+        notificationOverrides: const {'com.game': false},
         schedules: [
           LockSchedule(
             id: 's1',
@@ -42,6 +44,8 @@ void main() {
     expect(restored.intruderThreshold, 4);
     expect(restored.fakeCoverEnabled, isTrue);
     expect(restored.preventUninstall, isTrue);
+    expect(restored.hideNotifications, isTrue);
+    expect(restored.notificationOverrides, {'com.game': false});
     expect(restored.schedules.length, 1);
     expect(restored.schedules.first.name, 'Work');
     expect(restored.schedules.first.weekdays, {1, 2, 3, 4, 5});
@@ -53,6 +57,30 @@ void main() {
     expect(config.relock.mode, RelockMode.immediately);
     expect(config.intruderThreshold, 3);
     expect(config.preventUninstall, isFalse);
+    expect(config.hideNotifications, isFalse);
+    expect(config.notificationOverrides, isEmpty);
+  });
+
+  test('hidesNotificationsFor honours lock state, global flag, and override',
+      () {
+    const base = LockConfig(
+      lockedPackages: {'com.social', 'com.game'},
+      hideNotifications: true,
+      notificationOverrides: {'com.game': false},
+    );
+    // Locked + global on → hidden.
+    expect(base.hidesNotificationsFor('com.social'), isTrue);
+    // Locked but explicit override off → not hidden.
+    expect(base.hidesNotificationsFor('com.game'), isFalse);
+    // Not locked → never hidden even with global on.
+    expect(base.hidesNotificationsFor('com.other'), isFalse);
+
+    // Global off, but a per-app override opts one app in.
+    const optIn = LockConfig(
+      lockedPackages: {'com.social'},
+      notificationOverrides: {'com.social': true},
+    );
+    expect(optIn.hidesNotificationsFor('com.social'), isTrue);
   });
 
   test('toNativeMap contains exactly the enforcement subset + verifier', () {
@@ -70,6 +98,8 @@ void main() {
     expect(map['intruderThreshold'], 4);
     expect(map['fakeCoverEnabled'], true);
     expect(map['preventUninstall'], true);
+    expect(map['hideNotifications'], true);
+    expect(map['notificationOverrides'], {'com.game': false});
     expect(map['biometricEnabled'], true);
     expect(map['pinHash'], 'HASH');
     expect(map['pinSalt'], 'SALT');

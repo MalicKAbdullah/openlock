@@ -76,6 +76,31 @@ class ConfigStore(context: Context) {
 
     fun preventUninstall(): Boolean = config()?.optBoolean("preventUninstall", false) ?: false
 
+    /** Global default for hiding locked apps' notification content. */
+    fun hideNotifications(): Boolean = config()?.optBoolean("hideNotifications", false) ?: false
+
+    /** Per-package explicit overrides of [hideNotifications]; package → on/off. */
+    private fun notificationOverrides(): Map<String, Boolean> {
+        val obj = config()?.optJSONObject("notificationOverrides") ?: return emptyMap()
+        val map = HashMap<String, Boolean>(obj.length())
+        val keys = obj.keys()
+        while (keys.hasNext()) {
+            val key = keys.next()
+            map[key] = obj.optBoolean(key)
+        }
+        return map
+    }
+
+    /**
+     * Whether the notification listener should redact notifications from [pkg].
+     * Only locked apps qualify; the per-app override wins over the global flag.
+     * Mirror of the Dart `LockConfig.hidesNotificationsFor`.
+     */
+    fun shouldHideNotificationsFor(pkg: String): Boolean {
+        if (!lockedPackages().contains(pkg)) return false
+        return notificationOverrides()[pkg] ?: hideNotifications()
+    }
+
     fun biometricEnabled(): Boolean = config()?.optBoolean("biometricEnabled", false) ?: false
 
     fun pinHash(): String? = config()?.optString("pinHash")?.ifBlank { null }
