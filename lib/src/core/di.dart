@@ -20,14 +20,14 @@ import 'package:openlock/src/features/enforcement/services/config_repository.dar
 /// Composition root. Tests override the leaf providers (storage, file store,
 /// clock, biometrics, enforcement bridge) with in-memory fakes — no platform
 /// channels.
+final clockProvider = Provider<Clock>((_) => const SystemClock());
+
 /// The System/Light/Dark choice, loaded before `runApp` so the first frame
 /// (the lock screen included) already has the right theme. `main` overrides
 /// it with the loaded controller.
 final appearanceProvider = Provider<AppearanceController>(
   (_) => throw UnimplementedError('appearanceProvider is overridden in main'),
 );
-
-final clockProvider = Provider<Clock>((_) => const SystemClock());
 
 final secureStorageProvider = Provider<ISecureStorage>(
   (_) => const SecureStorageImpl(FlutterSecureStorage()),

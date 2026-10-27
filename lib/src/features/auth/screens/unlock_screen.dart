@@ -42,15 +42,19 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen> {
   Duration _cooldown = Duration.zero;
   Timer? _ticker;
   bool _recovering = false;
-  bool _biometric = false;
   int _failures = 0;
+
+  /// Fingerprint unlock is on: the button shows and the prompt starts on the
+  /// first frame.
+  late final bool _biometric =
+      ref.read(sessionProvider.notifier).biometricEnabled;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _syncCooldown();
-      _startBiometric();
+      _tryBiometric();
     });
   }
 
@@ -80,24 +84,14 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen> {
     }
   }
 
-  /// Shows the fingerprint button when biometric unlock is on and starts the
-  /// system prompt once; the button brings the prompt back.
-  Future<void> _startBiometric() async {
-    if (!await ref.read(biometricServiceProvider).isEnabled()) return;
-    if (!mounted) return;
-    setState(() => _biometric = true);
-    await _tryBiometric();
-  }
-
-  /// The system prompt shows its own mismatch and cancel feedback, so a
-  /// failed or dismissed prompt adds nothing here.
+  /// Starts the system prompt; the fingerprint button brings it back. The
+  /// prompt shows its own mismatch and cancel feedback, so a failed or
+  /// dismissed prompt adds nothing here.
   Future<void> _tryBiometric() async {
-    final biometric = ref.read(biometricServiceProvider);
-    if (!await biometric.isEnabled()) return;
-    if (await biometric.authenticate()) {
-      await ref
-          .read(sessionProvider.notifier)
-          .markUnlocked(UnlockMethod.biometric, then: AppRoutes.apps);
+    final session = ref.read(sessionProvider.notifier);
+    if (!session.biometricEnabled) return;
+    if (await ref.read(biometricServiceProvider).authenticate()) {
+      session.markUnlocked(UnlockMethod.biometric, then: AppRoutes.apps);
     }
   }
 
@@ -108,7 +102,7 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen> {
       case UnlockSuccess():
         // Re-push config in case anything changed while locked.
         unawaited(ref.read(configControllerProvider.notifier).pushToNative());
-        await ref
+        ref
             .read(sessionProvider.notifier)
             .markUnlocked(UnlockMethod.pin, then: AppRoutes.apps);
       case UnlockWrongPin(:final cooldown):
@@ -258,7 +252,6 @@ class _RecoveryFormState extends ConsumerState<_RecoveryForm> {
     final result = await ref.read(sessionProvider.notifier).recover(
           recoveryKey: _key.text,
           newPin: _pin.text,
-          then: AppRoutes.apps,
         );
     if (!mounted) return;
     setState(() => _busy = false);

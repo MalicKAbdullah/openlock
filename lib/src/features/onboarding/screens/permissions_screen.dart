@@ -98,6 +98,15 @@ class _PermissionsScreenState extends ConsumerState<PermissionsScreen>
                   required: false,
                   onFix: controller.requestNotifications,
                 ),
+                _PermissionTile(
+                  icon: Icons.notifications_off_rounded,
+                  title: 'Notification access',
+                  subtitle:
+                      'Lets OpenLock hide locked apps\' notification content.',
+                  granted: states.notificationAccess,
+                  required: false,
+                  onFix: controller.requestNotificationAccess,
+                ),
               ],
             ),
             const SizedBox(height: AppSpacing.lg),

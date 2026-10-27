@@ -36,6 +36,9 @@ final class LocalAuthBiometric implements IBiometricAuth {
         options: const AuthenticationOptions(
           biometricOnly: true,
           stickyAuth: true,
+          // Opening an app is not a payment-style confirmation; without this,
+          // Android makes face unlock wait for an extra "Confirm" tap.
+          sensitiveTransaction: false,
         ),
       );
     } catch (_) {

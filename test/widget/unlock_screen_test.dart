@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openlock/src/core/di.dart';
 import 'package:openlock/src/core/storage_keys.dart';
+import 'package:openlock/src/features/auth/providers/auth_providers.dart';
 import 'package:openlock/src/features/auth/screens/unlock_screen.dart';
 
 import '../helpers/fakes.dart';
@@ -29,17 +30,23 @@ void main() {
     if (biometric) {
       await storage.write(key: OpenLockKeys.biometricEnabled, value: 'true');
     }
+    final container = ProviderContainer(
+      overrides: [
+        secureStorageProvider.overrideWithValue(storage),
+        clockProvider.overrideWithValue(clock),
+        biometricAuthProvider
+            .overrideWithValue(FakeBiometricAuth(willSucceed: false)),
+        keyDerivationProvider.overrideWithValue(const FakeKeyDerivation()),
+        enforcementBridgeProvider.overrideWithValue(FakeEnforcementBridge()),
+        configFileStoreProvider.overrideWithValue(FakeConfigFileStore()),
+      ],
+    );
+    addTearDown(container.dispose);
+    // As in main: the unlock flags are read before the first frame.
+    await container.read(sessionProvider.notifier).resolved;
     await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          secureStorageProvider.overrideWithValue(storage),
-          clockProvider.overrideWithValue(clock),
-          biometricAuthProvider
-              .overrideWithValue(FakeBiometricAuth(willSucceed: false)),
-          keyDerivationProvider.overrideWithValue(const FakeKeyDerivation()),
-          enforcementBridgeProvider.overrideWithValue(FakeEnforcementBridge()),
-          configFileStoreProvider.overrideWithValue(FakeConfigFileStore()),
-        ],
+      UncontrolledProviderScope(
+        container: container,
         child: MaterialApp(
           theme: AppTheme.build(Brightness.light, accent: AppAccents.openlock),
           home: const UnlockScreen(),

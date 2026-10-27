@@ -15,6 +15,8 @@ final class LockConfig {
     this.intruderThreshold = 3,
     this.fakeCoverEnabled = false,
     this.preventUninstall = false,
+    this.hideNotifications = false,
+    this.notificationOverrides = const {},
     this.schedules = const [],
   });
 
@@ -42,7 +44,24 @@ final class LockConfig {
   /// OS deactivate-admin / app-info / uninstall screens.
   final bool preventUninstall;
 
+  /// Global default for hiding locked apps' notification content: the
+  /// NotificationListenerService replaces each notification with a redacted
+  /// OpenLock notice. Off by default. Only applies to locked apps.
+  final bool hideNotifications;
+
+  /// Per-package explicit overrides of [hideNotifications]. A package absent
+  /// from the map follows the global flag; present maps to its explicit choice.
+  final Map<String, bool> notificationOverrides;
+
   final List<LockSchedule> schedules;
+
+  /// Whether notifications from [package] should be hidden. Only locked apps
+  /// qualify; an explicit per-app override wins over the global flag. Mirror of
+  /// the Kotlin `ConfigStore.shouldHideNotificationsFor`.
+  bool hidesNotificationsFor(String package) {
+    if (!lockedPackages.contains(package)) return false;
+    return notificationOverrides[package] ?? hideNotifications;
+  }
 
   static const LockConfig empty = LockConfig();
 
@@ -55,6 +74,8 @@ final class LockConfig {
     int? intruderThreshold,
     bool? fakeCoverEnabled,
     bool? preventUninstall,
+    bool? hideNotifications,
+    Map<String, bool>? notificationOverrides,
     List<LockSchedule>? schedules,
   }) =>
       LockConfig(
@@ -67,6 +88,9 @@ final class LockConfig {
         intruderThreshold: intruderThreshold ?? this.intruderThreshold,
         fakeCoverEnabled: fakeCoverEnabled ?? this.fakeCoverEnabled,
         preventUninstall: preventUninstall ?? this.preventUninstall,
+        hideNotifications: hideNotifications ?? this.hideNotifications,
+        notificationOverrides:
+            notificationOverrides ?? this.notificationOverrides,
         schedules: schedules ?? this.schedules,
       );
 
@@ -79,6 +103,8 @@ final class LockConfig {
         'intruderThreshold': intruderThreshold,
         'fakeCoverEnabled': fakeCoverEnabled,
         'preventUninstall': preventUninstall,
+        'hideNotifications': hideNotifications,
+        'notificationOverrides': notificationOverrides,
         'schedules': schedules.map((s) => s.toJson()).toList(),
       };
 
@@ -96,6 +122,11 @@ final class LockConfig {
         intruderThreshold: (json['intruderThreshold'] as num?)?.toInt() ?? 3,
         fakeCoverEnabled: json['fakeCoverEnabled'] as bool? ?? false,
         preventUninstall: json['preventUninstall'] as bool? ?? false,
+        hideNotifications: json['hideNotifications'] as bool? ?? false,
+        notificationOverrides:
+            ((json['notificationOverrides'] as Map<dynamic, dynamic>?) ??
+                    const {})
+                .map((key, value) => MapEntry(key as String, value as bool)),
         schedules: ((json['schedules'] as List<dynamic>?) ?? const [])
             .map((e) => LockSchedule.fromJson(e as Map<String, dynamic>))
             .toList(),
@@ -118,6 +149,8 @@ final class LockConfig {
         'intruderThreshold': intruderThreshold,
         'fakeCoverEnabled': fakeCoverEnabled,
         'preventUninstall': preventUninstall,
+        'hideNotifications': hideNotifications,
+        'notificationOverrides': notificationOverrides,
         'biometricEnabled': biometricEnabled,
         'schedules': schedules.map((s) => s.toJson()).toList(),
         'pinHash': pinHash,

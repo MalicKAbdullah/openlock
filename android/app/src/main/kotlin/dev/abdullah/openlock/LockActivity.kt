@@ -57,7 +57,7 @@ class LockActivity : FragmentActivity() {
             )
         }
 
-        store = ConfigStore(this)
+        store = ConfigStore.get(this)
         lockedPackage = intent.getStringExtra(EXTRA_PACKAGE).orEmpty()
 
         if (store.fakeCoverEnabled()) {

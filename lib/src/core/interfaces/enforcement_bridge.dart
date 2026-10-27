@@ -1,19 +1,24 @@
-import 'dart:typed_data';
-
 /// A launchable app installed on the device, as reported by the native
-/// PackageManager query.
+/// PackageManager query. Metadata only: the icon is fetched separately, per
+/// visible row, through [IEnforcementBridge.getAppIcons].
 final class InstalledApp {
-  const InstalledApp({
+  InstalledApp({
     required this.packageName,
     required this.label,
-    this.icon,
-  });
+    required this.versionCode,
+  })  : labelKey = label.toLowerCase(),
+        packageKey = packageName.toLowerCase();
 
   final String packageName;
   final String label;
 
-  /// PNG bytes of the launcher icon, or null when unavailable.
-  final Uint8List? icon;
+  /// The installed build; it keys the cached icon, so an update re-renders it.
+  final int versionCode;
+
+  /// [label] and [packageName] lower-cased once, for case-insensitive sorting
+  /// and search without lower-casing inside every comparison.
+  final String labelKey;
+  final String packageKey;
 }
 
 /// Snapshot of the special-access permissions the enforcement service needs.
@@ -22,6 +27,8 @@ final class PermissionStates {
     required this.usageAccess,
     required this.overlay,
     required this.notifications,
+    required this.notificationAccess,
+    required this.screenGuardAccess,
     required this.batteryExempt,
     required this.serviceRunning,
   });
@@ -30,12 +37,24 @@ final class PermissionStates {
       : usageAccess = false,
         overlay = false,
         notifications = false,
+        notificationAccess = false,
+        screenGuardAccess = false,
         batteryExempt = false,
         serviceRunning = false;
 
   final bool usageAccess;
   final bool overlay;
   final bool notifications;
+
+  /// Notification-listener access, required to hide locked apps' notification
+  /// content. Separate from [notifications] (the POST_NOTIFICATIONS runtime
+  /// grant for OpenLock's own notices).
+  final bool notificationAccess;
+
+  /// OpenLock's uninstall-guard accessibility service is enabled, letting the
+  /// "Prevent uninstall" guard recognise OpenLock's own App info, uninstall,
+  /// and device-admin screens.
+  final bool screenGuardAccess;
   final bool batteryExempt;
   final bool serviceRunning;
 
@@ -49,6 +68,8 @@ final class PermissionStates {
     bool? usageAccess,
     bool? overlay,
     bool? notifications,
+    bool? notificationAccess,
+    bool? screenGuardAccess,
     bool? batteryExempt,
     bool? serviceRunning,
   }) =>
@@ -56,6 +77,8 @@ final class PermissionStates {
         usageAccess: usageAccess ?? this.usageAccess,
         overlay: overlay ?? this.overlay,
         notifications: notifications ?? this.notifications,
+        notificationAccess: notificationAccess ?? this.notificationAccess,
+        screenGuardAccess: screenGuardAccess ?? this.screenGuardAccess,
         batteryExempt: batteryExempt ?? this.batteryExempt,
         serviceRunning: serviceRunning ?? this.serviceRunning,
       );
@@ -96,8 +119,13 @@ abstract interface class IEnforcementBridge {
   Future<void> pushConfig(Map<String, dynamic> config);
 
   /// The list of launchable apps (excluding OpenLock and launcher-less system
-  /// apps) for the app picker.
+  /// apps) for the app picker, without icons.
   Future<List<InstalledApp>> getInstalledApps();
+
+  /// Paths of launcher-icon PNGs for [apps], keyed by package name; null for
+  /// a package that has no loadable icon. Native renders an icon into its
+  /// disk cache the first time a version is requested.
+  Future<Map<String, String?>> getAppIcons(List<InstalledApp> apps);
 
   Future<PermissionStates> getPermissionStates();
 
@@ -105,6 +133,16 @@ abstract interface class IEnforcementBridge {
   Future<void> requestOverlayPermission();
   Future<void> requestBatteryExemption();
   Future<void> requestNotificationPermission();
+
+  /// Opens the system "Notification access" screen so the user can grant
+  /// OpenLock's NotificationListenerService (needed to hide locked apps'
+  /// notification content). The grant is read back via [getPermissionStates].
+  Future<void> requestNotificationAccess();
+
+  /// Opens the system Accessibility settings so the user can enable OpenLock's
+  /// uninstall-guard service. The grant is read back via
+  /// [getPermissionStates].
+  Future<void> requestScreenGuardAccess();
 
   Future<bool> isServiceRunning();
   Future<void> startService();

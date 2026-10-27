@@ -64,6 +64,40 @@ class AboutScreen extends ConsumerWidget {
                 ],
               ),
             ),
+            const SizedBox(height: AppSpacing.md),
+            VaultCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.app_blocking_outlined,
+                          color: c.accent, size: 20),
+                      const SizedBox(width: AppSpacing.sm),
+                      Text(
+                        'Removing OpenLock',
+                        style: AppTextStyles.h4.copyWith(color: c.textPrimary),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                    'With uninstall protection on, OpenLock is a device '
+                    'administrator, so Android blocks uninstalling it directly. '
+                    'To remove it yourself: open Settings in OpenLock, turn '
+                    'off "Prevent uninstall" (confirm your PIN or fingerprint), '
+                    'then uninstall the app normally. While protection is on, '
+                    'OpenLock also guards its own App info, uninstall, and '
+                    'device-admin screens with the lock (with the uninstall '
+                    'screen guard enabled in Accessibility) so no one can '
+                    'disable it without your PIN.',
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: c.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),

@@ -56,7 +56,7 @@ class OpenLockMonitorService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        store = ConfigStore(this)
+        store = ConfigStore.get(this)
         usageStatsManager = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
         registerReceiver(screenReceiver, IntentFilter(Intent.ACTION_SCREEN_OFF))
     }
@@ -79,9 +79,7 @@ class OpenLockMonitorService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     private fun tick() {
-        val foreground = foregroundApp() ?: return
-        val current = foreground.first
-        val currentClass = foreground.second
+        val current = foregroundApp() ?: return
         val now = System.currentTimeMillis()
 
         // Track departures from the foreground for the relock policy.
@@ -91,14 +89,20 @@ class OpenLockMonitorService : Service() {
         }
         lastForegroundPkg = current
 
+        // Once the user is in an app, its hidden-notification backlog is stale —
+        // clear OpenLock's redacted notice for it. (No-op when the listener is
+        // off or nothing was hidden.)
+        OpenLockNotificationListenerService.onAppForegrounded(current)
+
         // Never lock ourselves.
         if (current == packageName) return
 
-        // Uninstall protection: guard the OS deactivate-admin / app-info /
-        // uninstall screens (best-effort; see LockLogic + README). Runs before
-        // the normal locked-app check because Settings is not in the locked set.
-        if (store.pinHash() != null &&
-            LockLogic.shouldGuardUninstall(store.preventUninstall(), current, currentClass)
+        // Uninstall protection: guard the OS screens about OpenLock itself
+        // (App info, uninstall dialog, device-admin deactivation), as read by
+        // OpenLockGuardAccessibilityService. Runs before the normal locked-app
+        // check because Settings is not in the locked set.
+        if (store.pinHash() != null && store.preventUninstall() &&
+            GuardedScreen.isShowing(current)
         ) {
             // Respect an in-session unlock so the user can actually reach the
             // deactivate screen after authenticating; re-lock once the screen
@@ -148,23 +152,20 @@ class OpenLockMonitorService : Service() {
         runCatching { startActivity(intent) }
     }
 
-    /** The latest foreground (package, activityClass). Class name powers the
-     *  best-effort uninstall-screen guard; it may be null on some devices. */
-    private fun foregroundApp(): Pair<String, String?>? {
+    /** The latest foreground package. */
+    private fun foregroundApp(): String? {
         val end = System.currentTimeMillis()
         val begin = end - LOOKBACK_MS
         val events = usageStatsManager.queryEvents(begin, end)
         var pkg: String? = null
-        var cls: String? = null
         val event = UsageEvents.Event()
         while (events.hasNextEvent()) {
             events.getNextEvent(event)
             if (event.eventType == UsageEvents.Event.MOVE_TO_FOREGROUND) {
                 pkg = event.packageName
-                cls = event.className
             }
         }
-        return pkg?.let { Pair(it, cls) }
+        return pkg
     }
 
     private fun buildNotification(): Notification {

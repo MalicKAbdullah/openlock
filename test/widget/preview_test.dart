@@ -12,6 +12,7 @@ import 'package:openlock/src/core/di.dart';
 import 'package:openlock/src/core/interfaces/enforcement_bridge.dart';
 import 'package:openlock/src/core/storage_keys.dart';
 import 'package:openlock/src/features/apps/screens/app_picker_screen.dart';
+import 'package:openlock/src/features/auth/providers/auth_providers.dart';
 import 'package:openlock/src/features/auth/screens/setup_pin_screen.dart';
 import 'package:openlock/src/features/auth/screens/unlock_screen.dart';
 import 'package:openlock/src/features/enforcement/providers/config_providers.dart';
@@ -34,8 +35,8 @@ import '../helpers/fakes.dart';
 /// design review only; it asserts nothing.
 final String? _gallery = Platform.environment['GALLERY'];
 
-/// A 96px launcher-style icon (colored squircle with a white disc), matching
-/// the PNGs the native side sends, so previews show what real icons look like.
+/// A launcher-style icon (colored squircle with a white disc), like the PNGs
+/// native caches, so previews show what real icons look like.
 Future<Uint8List> _fakeIcon(Color color) async {
   const size = 96.0;
   final recorder = ui.PictureRecorder();
@@ -107,8 +108,14 @@ void main() {
           'com.spotify.music': await _fakeIcon(const Color(0xFF1DB954)),
           'com.android.chrome': await _fakeIcon(const Color(0xFF4285F4)),
         });
+    final iconDir = Directory.systemTemp.createTempSync('openlock_icons');
+    addTearDown(() => iconDir.deleteSync(recursive: true));
+    final iconPaths = {
+      for (final MapEntry(:key, :value) in icons!.entries)
+        key: (File('${iconDir.path}/$key.png')..writeAsBytesSync(value)).path,
+    };
     InstalledApp app(String pkg, String label) =>
-        InstalledApp(packageName: pkg, label: label, icon: icons![pkg]);
+        InstalledApp(packageName: pkg, label: label, versionCode: 1);
 
     final bridge = FakeEnforcementBridge(
       apps: [
@@ -124,10 +131,14 @@ void main() {
         usageAccess: true,
         overlay: false,
         notifications: true,
+        notificationAccess: false,
+        screenGuardAccess: false,
         batteryExempt: false,
         serviceRunning: false,
       ),
-    )..records.addAll([
+    )
+      ..iconPaths = iconPaths
+      ..records.addAll([
         IntruderRecord(
           id: '1',
           packageName: 'com.whatsapp',
@@ -217,6 +228,7 @@ void main() {
               .toString(),
         );
       }
+      await c.read(sessionProvider.notifier).resolved;
       return c;
     }
 
@@ -367,8 +379,9 @@ Future<void> _shoot(
     ),
   );
   await tester.pump(const Duration(milliseconds: 300));
+  // Icon files decode on real I/O, outside the fake clock.
   await tester.runAsync(
-    () => Future<void>.delayed(const Duration(milliseconds: 50)),
+    () => Future<void>.delayed(const Duration(milliseconds: 200)),
   );
   await tester.pump(const Duration(milliseconds: 300));
   await tester.pump(const Duration(milliseconds: 300));

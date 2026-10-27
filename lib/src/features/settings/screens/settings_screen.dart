@@ -10,6 +10,7 @@ import 'package:openlock/src/core/widgets/screen_header.dart';
 import 'package:openlock/src/features/enforcement/models/lock_config.dart';
 import 'package:openlock/src/features/enforcement/models/relock_policy.dart';
 import 'package:openlock/src/features/enforcement/providers/config_providers.dart';
+import 'package:openlock/src/features/onboarding/providers/permissions_providers.dart';
 import 'package:openlock/src/features/settings/providers/settings_providers.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -35,10 +36,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Re-read the live device-admin state after returning from the system
-    // "activate device admin" dialog.
+    // Re-read live state after returning from a system screen: device-admin
+    // activation, and notification-access / accessibility grants.
     if (state == AppLifecycleState.resumed) {
       ref.read(preventUninstallControllerProvider.notifier).refresh();
+      ref.read(permissionsControllerProvider.notifier).refresh();
     }
   }
 
@@ -180,6 +182,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
         ref.watch(biometricEnabledProvider).valueOrNull ?? false;
     final preventUninstall =
         ref.watch(preventUninstallControllerProvider).valueOrNull ?? false;
+    final permissions = ref.watch(permissionsControllerProvider).valueOrNull;
+    final notificationAccess = permissions?.notificationAccess ?? false;
+    final screenGuardAccess = permissions?.screenGuardAccess ?? false;
 
     Widget toggle({
       required IconData icon,
@@ -222,6 +227,56 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                   title: 'Relock behavior',
                   subtitle: _relockLabel(config.relock),
                   onTap: () => context.push(AppRoutes.relock),
+                ),
+              ],
+            ),
+            const SectionLead('Notifications'),
+            RowGroup(
+              children: [
+                toggle(
+                  icon: Icons.notifications_off_outlined,
+                  title: 'Hide notification content',
+                  subtitle: config.hideNotifications
+                      ? 'Locked apps show a redacted notice'
+                      : 'Replace locked apps\' notifications with a count',
+                  value: config.hideNotifications,
+                  onChanged: (value) async {
+                    final messenger = ScaffoldMessenger.of(context);
+                    await controller.setHideNotifications(value);
+                    if (value && !notificationAccess) {
+                      messenger.showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Grant Notification access so OpenLock can hide '
+                            'notification content.',
+                          ),
+                        ),
+                      );
+                    }
+                  },
+                ),
+                SettingsTile(
+                  icon: notificationAccess
+                      ? Icons.check_circle_outline
+                      : Icons.error_outline,
+                  title: 'Notification access',
+                  subtitle: notificationAccess
+                      ? 'Granted'
+                      : 'Required to hide notification content',
+                  showChevron: false,
+                  trailing: notificationAccess
+                      ? null
+                      : TextButton(
+                          onPressed: () => ref
+                              .read(permissionsControllerProvider.notifier)
+                              .requestNotificationAccess(),
+                          child: const Text('Grant'),
+                        ),
+                  onTap: notificationAccess
+                      ? null
+                      : () => ref
+                          .read(permissionsControllerProvider.notifier)
+                          .requestNotificationAccess(),
                 ),
               ],
             ),
@@ -289,6 +344,32 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                     }
                   },
                 ),
+                if (preventUninstall)
+                  SettingsTile(
+                    icon: screenGuardAccess
+                        ? Icons.check_circle_outline
+                        : Icons.error_outline,
+                    title: 'Uninstall screen guard',
+                    subtitle: screenGuardAccess
+                        ? 'PIN required on OpenLock\'s App info and uninstall '
+                            'screens'
+                        : 'Enable in Accessibility to guard OpenLock\'s App '
+                            'info and uninstall screens',
+                    showChevron: false,
+                    trailing: screenGuardAccess
+                        ? null
+                        : TextButton(
+                            onPressed: () => ref
+                                .read(permissionsControllerProvider.notifier)
+                                .requestScreenGuardAccess(),
+                            child: const Text('Enable'),
+                          ),
+                    onTap: screenGuardAccess
+                        ? null
+                        : () => ref
+                            .read(permissionsControllerProvider.notifier)
+                            .requestScreenGuardAccess(),
+                  ),
                 toggle(
                   icon: Icons.shuffle,
                   title: 'Randomize keypad',

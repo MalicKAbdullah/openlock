@@ -79,6 +79,37 @@
                 android:value="App lock: detect the foreground app to lock chosen apps behind a PIN."/>
         </service>
 
+        <!-- Notification-privacy listener. When "hide notification content" is
+             on for a locked app, this replaces that app's notifications with a
+             redacted OpenLock notice. User grants access under Settings →
+             Notifications → Notification access. -->
+        <service
+            android:name=".OpenLockNotificationListenerService"
+            android:exported="false"
+            android:label="OpenLock notification privacy"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService"/>
+            </intent-filter>
+        </service>
+
+        <!-- Uninstall-guard accessibility service (optional). Lets the guard
+             read which app a Settings / package-installer screen is about, so
+             it locks only OpenLock's own App info, uninstall, and device-admin
+             screens. User grants it under Settings → Accessibility. -->
+        <service
+            android:name=".OpenLockGuardAccessibilityService"
+            android:exported="false"
+            android:label="@string/guard_accessibility_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/guard_accessibility_service"/>
+        </service>
+
         <!-- Device administrator for uninstall protection. Being an active
              admin makes Android block uninstall until it is deactivated;
              OpenLock only deactivates it after in-app PIN/biometric re-auth. -->

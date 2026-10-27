@@ -31,6 +31,11 @@ android {
         jvmTarget = JavaVersion.VERSION_17.toString()
     }
 
+    buildFeatures {
+        // BuildConfig.DEBUG gates the native timing logs.
+        buildConfig = true
+    }
+
     defaultConfig {
         applicationId = "dev.abdullah.openlock"
         // EncryptedSharedPreferences (AndroidKeyStore AES) needs API 23+.
@@ -76,4 +81,8 @@ dependencies {
     // Fingerprint / face unlock on the lock screen.
     implementation("androidx.biometric:biometric:1.1.0")
     implementation("androidx.core:core-ktx:1.13.1")
+
+    // JVM unit tests for the pure enforcement logic (notification redaction and
+    // the uninstall-screen matcher). Run in CI via `gradlew testDebugUnitTest`.
+    testImplementation("junit:junit:4.13.2")
 }
