@@ -37,7 +37,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // Re-read live state after returning from a system screen: device-admin
-    // activation, and notification-access grant.
+    // activation, and notification-access / accessibility grants.
     if (state == AppLifecycleState.resumed) {
       ref.read(preventUninstallControllerProvider.notifier).refresh();
       ref.read(permissionsControllerProvider.notifier).refresh();
@@ -182,11 +182,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
         ref.watch(biometricEnabledProvider).valueOrNull ?? false;
     final preventUninstall =
         ref.watch(preventUninstallControllerProvider).valueOrNull ?? false;
-    final notificationAccess = ref
-            .watch(permissionsControllerProvider)
-            .valueOrNull
-            ?.notificationAccess ??
-        false;
+    final permissions = ref.watch(permissionsControllerProvider).valueOrNull;
+    final notificationAccess = permissions?.notificationAccess ?? false;
+    final screenGuardAccess = permissions?.screenGuardAccess ?? false;
 
     Widget toggle({
       required IconData icon,
@@ -341,6 +339,32 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                     }
                   },
                 ),
+                if (preventUninstall)
+                  SettingsTile(
+                    icon: screenGuardAccess
+                        ? Icons.check_circle_outline
+                        : Icons.error_outline,
+                    title: 'Uninstall screen guard',
+                    subtitle: screenGuardAccess
+                        ? 'PIN required on OpenLock\'s App info and uninstall '
+                            'screens'
+                        : 'Enable in Accessibility to guard OpenLock\'s App '
+                            'info and uninstall screens',
+                    showChevron: false,
+                    trailing: screenGuardAccess
+                        ? null
+                        : TextButton(
+                            onPressed: () => ref
+                                .read(permissionsControllerProvider.notifier)
+                                .requestScreenGuardAccess(),
+                            child: const Text('Enable'),
+                          ),
+                    onTap: screenGuardAccess
+                        ? null
+                        : () => ref
+                            .read(permissionsControllerProvider.notifier)
+                            .requestScreenGuardAccess(),
+                  ),
                 toggle(
                   icon: Icons.shuffle,
                   title: 'Randomize keypad',

@@ -63,14 +63,14 @@ An app lock is only as good as its resistance to being switched off. OpenLock of
 
 - **Enabling it** launches the system "activate device admin" dialog. Once OpenLock is an active device admin, **Android refuses to uninstall it** — the OS itself shows "This app is a device administrator and must be deactivated before you can uninstall."
 - **Turning it back off is auth-gated.** OpenLock will **only** deactivate device admin after a successful **PIN or fingerprint** check *inside the app*. There is no silent deactivation path in the UI — flip the toggle off, prove it's you, and only then is admin removed.
-- **Best-effort screen guard.** While protection is on, the background monitor also watches for the OS screens that could be used to disable it — the **Settings → device-admin deactivation** screen, this app's **App info / uninstall** screen, and the **package-installer** uninstall dialog — and throws up the lock screen (PIN/biometric) over them first.
+- **Best-effort screen guard.** While protection is on, OpenLock also throws up the lock screen (PIN/biometric) over the OS screens about **OpenLock itself** that could be used to disable it — its **device-admin deactivation** screen, its **App info** page (however you reach it, including Settings search), and its **package-installer** uninstall dialog. Other apps' App info pages and uninstall dialogs are never guarded. The guard needs the optional **OpenLock uninstall guard** accessibility service (Settings → Security → Uninstall screen guard), which reads only Settings and package-installer windows to see which app they are about.
 
 ### Honest limits
 
 The screen guard is **best-effort and Android-version / OEM dependent** — please don't treat it as unbreakable:
 
-- It relies on `UsageStatsManager` reporting the foreground activity's class name. Some OEM skins and **newer Android releases** name, reorder, or restrict these screens differently, so the overlay may not always fire in time (there's an inherent poll-and-launch race).
-- Because the App-info screen doesn't reveal *which* app is being viewed, the guard is intentionally broad: it may also prompt for your PIN when you open **another** app's info/uninstall page while protection is on.
+- It recognises OpenLock's screens by their content: the App info header and device-admin screen naming OpenLock (Settings view ids used by AOSP and Samsung One UI), and the uninstall dialog mentioning OpenLock's label or package name. OEM skins with a different App info layout may not be recognised, and the overlay can lose a race with a fast tap (the monitor polls every 300 ms).
+- Without the accessibility service enabled there is no screen guard; device admin still makes Android refuse the uninstall itself.
 - Device admin blocks the normal uninstall flow, but a determined user with **ADB, Safe Mode, or a factory reset** can still remove any non-system app. This is a deterrent against casual/opportunistic removal — the documented technique app lockers use — not a guarantee against a technical adversary with physical access.
 - The device-admin dialog and the guard require the permissions listed below; on devices where they're unavailable the toggle simply won't take effect.
 
@@ -96,6 +96,7 @@ OpenLock asks only for what cross-app locking genuinely needs, and explains each
 | **Display over other apps** (`SYSTEM_ALERT_WINDOW`) | To show the lock screen on top of a locked app, and to launch it reliably from the background on modern Android. |
 | **Foreground service** (`FOREGROUND_SERVICE` / `_SPECIAL_USE`) | To keep the guard running with an ongoing notification. |
 | **Notifications** (`POST_NOTIFICATIONS`) | To show the ongoing "protection active" notice (Android 13+). |
+| **Accessibility** (`BIND_ACCESSIBILITY_SERVICE`) | Optional — only for the **Prevent uninstall** screen guard. Reads Settings and package-installer windows to tell whether they are about OpenLock; nothing is stored or leaves the device. |
 | **Device administrator** (`BIND_DEVICE_ADMIN`) | Optional — only if you enable **Prevent uninstall**. Being an active device admin is what makes Android block the app's uninstall until you turn protection off with your PIN. |
 | **Ignore battery optimization** | Optional, but keeps the guard alive in the background on aggressive OEM ROMs. |
 | **Camera** | Optional — only used for silent intruder snapshots if you enable that feature. |

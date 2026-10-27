@@ -98,6 +98,7 @@ final class FakeEnforcementBridge implements IEnforcementBridge {
               overlay: true,
               notifications: true,
               notificationAccess: true,
+              screenGuardAccess: true,
               batteryExempt: true,
               serviceRunning: true,
             );
@@ -135,6 +136,9 @@ final class FakeEnforcementBridge implements IEnforcementBridge {
 
   @override
   Future<void> requestNotificationAccess() async {}
+
+  @override
+  Future<void> requestScreenGuardAccess() async {}
 
   @override
   Future<bool> isServiceRunning() async => serviceRunning;

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="guard_accessibility_label">OpenLock uninstall guard</string>
+    <string name="guard_accessibility_description">Lets OpenLock ask for your PIN when Settings or the package installer shows a screen that could remove OpenLock (its App info page, its uninstall dialog, or its device-admin deactivation). OpenLock only checks whether these screens are about OpenLock; it reads nothing else and nothing leaves your device.</string>
+</resources>

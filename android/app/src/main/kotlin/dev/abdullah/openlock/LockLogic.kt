@@ -57,39 +57,6 @@ object LockLogic {
     private fun dartWeekday(calendarDow: Int): Int =
         if (calendarDow == Calendar.SUNDAY) 7 else calendarDow - 1
 
-    private const val SETTINGS_PACKAGE = "com.android.settings"
-
-    /** Settings activity class-name substrings for the deactivate-admin,
-     *  app-info, and uninstall screens. Mirror of the Dart UninstallGuard. */
-    private val SETTINGS_CLASS_HINTS = listOf(
-        "deviceadmin",
-        "installedappdetails",
-        "appinfodashboard",
-        "applicationdetails",
-        "uninstall",
-    )
-
-    /**
-     * Best-effort decision, mirrored by the Dart [UninstallGuard]: while
-     * "prevent uninstall" is on, should we throw up the lock screen over the OS
-     * screen [pkg]/[className] that could deactivate device admin or uninstall
-     * the app? Android-version- and OEM-dependent (see README).
-     */
-    fun shouldGuardUninstall(preventUninstall: Boolean, pkg: String, className: String?): Boolean {
-        if (!preventUninstall) return false
-        if (isPackageInstaller(pkg)) return true
-        if (pkg == SETTINGS_PACKAGE) {
-            val cls = className?.lowercase() ?: return false
-            return SETTINGS_CLASS_HINTS.any { cls.contains(it) }
-        }
-        return false
-    }
-
-    private fun isPackageInstaller(pkg: String): Boolean =
-        pkg == "com.android.packageinstaller" ||
-            pkg == "com.google.android.packageinstaller" ||
-            pkg.endsWith(".packageinstaller")
-
     /**
      * The relock decision. [unlockedAt]/[leftAppAt]/[screenOffAt] use 0 to mean
      * "not happened". Mirrors the Dart LockPolicyEngine.

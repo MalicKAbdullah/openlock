@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Uninstall-guard accessibility service: reads only window-state and
+    window-content changes so the guard can see which app a Settings or
+    package-installer screen is about. View ids are needed to recognise the
+    App info / device-admin header.
+-->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/guard_accessibility_description"
+    android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:accessibilityFlags="flagReportViewIds"
+    android:canRetrieveWindowContent="true"
+    android:notificationTimeout="150"
+    android:isAccessibilityTool="false"/>
