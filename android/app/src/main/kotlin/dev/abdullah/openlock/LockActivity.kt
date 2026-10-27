@@ -1,22 +1,40 @@
 package dev.abdullah.openlock
 
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.content.res.ColorStateList
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Path
+import android.graphics.RectF
 import android.graphics.Typeface
+import android.graphics.drawable.AdaptiveIconDrawable
+import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.Drawable
+import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.RippleDrawable
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.text.TextUtils
+import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
-import android.widget.Button
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
+import androidx.core.content.res.ResourcesCompat
+import androidx.core.graphics.ColorUtils
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.fragment.app.FragmentActivity
 
 /**
@@ -39,8 +57,18 @@ class LockActivity : FragmentActivity() {
     /** A BiometricPrompt is currently up; guards against double-prompting. */
     private var biometricInFlight = false
 
-    private lateinit var dotsView: TextView
+    private lateinit var palette: LockPalette
+    private lateinit var regular: Typeface
+    private lateinit var medium: Typeface
+    private lateinit var semiBold: Typeface
+    private lateinit var dotsRow: LinearLayout
     private lateinit var messageView: TextView
+    private lateinit var backspaceKey: View
+    private lateinit var checkKey: View
+    private lateinit var keypad: View
+
+    /** Every keypad key, for sizing and for dimming during a cooldown. */
+    private val keys = mutableListOf<View>()
     private val handler = Handler(Looper.getMainLooper())
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -77,6 +105,11 @@ class LockActivity : FragmentActivity() {
 
     /** Swaps in the real PIN screen and kicks off the biometric prompt. */
     private fun showRealLock() {
+        palette = LockPalette.resolve(this)
+        regular = ResourcesCompat.getFont(this, R.font.mona_sans_regular)!!
+        medium = ResourcesCompat.getFont(this, R.font.mona_sans_medium)!!
+        semiBold = ResourcesCompat.getFont(this, R.font.mona_sans_semibold)!!
+        applyWindowColors()
         setContentView(buildLockView())
         realLockShown = true
         triggerBiometric()
@@ -95,67 +128,110 @@ class LockActivity : FragmentActivity() {
 
     // --- UI construction ----------------------------------------------------
 
+    /**
+     * The suite lock layout, matching the Flutter unlock screen: on the flat
+     * background a centred column a little above the middle (2 parts of the
+     * free space above, 3 below) with the locked app's icon and name, "Locked
+     * by OpenLock", the PIN dots, the error line and the keypad; low on the
+     * screen the fingerprint button (when enabled), then "by Offlyne".
+     */
     private fun buildLockView(): View {
-        val bg = color(R.color.lockBackground)
+        val p = palette
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setBackgroundColor(bg)
-            setPadding(dp(24), dp(48), dp(24), dp(48))
+            setBackgroundColor(p.background)
+        }
+        ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            view.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+            insets
+        }
+        // The keys are sized from the real height so the keypad always fits.
+        root.addOnLayoutChangeListener { _, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
+            if (right - left != oldRight - oldLeft || bottom - top != oldBottom - oldTop) {
+                val width = right - left - root.paddingLeft - root.paddingRight
+                val height = bottom - top - root.paddingTop - root.paddingBottom
+                root.post { sizeKeypad(width, height) }
+            }
         }
 
-        root.addView(TextView(this).apply {
-            text = "🔒"
-            textSize = 40f
-            gravity = Gravity.CENTER
-        })
-        root.addView(TextView(this).apply {
-            text = "Enter your PIN"
-            setTextColor(color(R.color.lockTextPrimary))
-            textSize = 22f
-            typeface = Typeface.DEFAULT_BOLD
-            gravity = Gravity.CENTER
-            setPadding(0, dp(12), 0, dp(4))
-        })
-        root.addView(TextView(this).apply {
-            text = appLabel(lockedPackage)
-            setTextColor(color(R.color.lockTextSecondary))
-            textSize = 14f
-            gravity = Gravity.CENTER
-        })
-
-        dotsView = TextView(this).apply {
-            setTextColor(color(R.color.lockAccent))
-            textSize = 28f
-            gravity = Gravity.CENTER
-            setPadding(0, dp(20), 0, dp(8))
-            letterSpacing = 0.3f
+        val column = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(dp(24), dp(24), dp(24), dp(24))
         }
-        root.addView(dotsView)
+        column.addView(
+            ImageView(this).apply { setImageBitmap(appIcon(lockedPackage, dp(MARK_DP))) },
+            LinearLayout.LayoutParams(dp(MARK_DP), dp(MARK_DP)),
+        )
+        column.addView(
+            text(appLabel(lockedPackage), TITLE_SP, semiBold, p.textPrimary).apply {
+                maxLines = 1
+                ellipsize = TextUtils.TruncateAt.END
+            },
+            wrapWidth(top = 16),
+        )
+        column.addView(
+            text("Locked by OpenLock", SUBTITLE_SP, regular, p.textSecondary),
+            wrapWidth(top = 4),
+        )
 
-        messageView = TextView(this).apply {
-            setTextColor(color(R.color.lockError))
-            textSize = 13f
+        dotsRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
-            minHeight = dp(20)
         }
-        root.addView(messageView)
+        column.addView(dotsRow, wrapWidth(top = 32))
 
-        root.addView(buildKeypad())
+        messageView = text("", 12f, medium, p.error).apply {
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.END
+            gravity = Gravity.CENTER
+        }
+        column.addView(
+            messageView,
+            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(ERROR_DP)).apply {
+                topMargin = dp(DOT_GAP_DP)
+            },
+        )
+        keypad = buildKeypad()
+        column.addView(
+            keypad,
+            LinearLayout.LayoutParams(dp(KEYPAD_MAX_WIDTH_DP), ViewGroup.LayoutParams.WRAP_CONTENT)
+                .apply { topMargin = dp(ERROR_GAP_DP) },
+        )
+
+        root.addView(View(this), LinearLayout.LayoutParams(0, 0, 2f))
+        root.addView(
+            column,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ),
+        )
+        root.addView(View(this), LinearLayout.LayoutParams(0, 0, 3f))
 
         // If the user enabled biometrics, always show the fingerprint button
         // immediately — no async capability probe hiding it. Tapping re-triggers
         // the prompt; the PIN pad above stays available as the fallback.
         if (store.biometricEnabled()) {
-            root.addView(TextView(this).apply {
-                text = "Use fingerprint"
-                setTextColor(color(R.color.lockAccent))
-                textSize = 16f
-                gravity = Gravity.CENTER
-                setPadding(0, dp(16), 0, 0)
-                setOnClickListener { triggerBiometric() }
-            })
+            root.addView(
+                fingerprintButton(),
+                LinearLayout.LayoutParams(dp(FINGERPRINT_DP), dp(FINGERPRINT_DP)).apply {
+                    gravity = Gravity.CENTER_HORIZONTAL
+                    bottomMargin = dp(32)
+                },
+            )
         }
+        root.addView(
+            endorsement(),
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                gravity = Gravity.CENTER_HORIZONTAL
+                bottomMargin = dp(20)
+            },
+        )
 
         updateDots()
         return root
@@ -165,55 +241,201 @@ class LockActivity : FragmentActivity() {
         val digits = (0..9).map { it.toString() }.toMutableList()
         if (store.randomizeKeypad()) digits.shuffle()
 
-        val grid = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setPadding(0, dp(16), 0, 0)
+        val grid = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        fun row(cells: List<View>, last: Boolean) {
+            val line = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+            cells.forEachIndexed { i, key ->
+                line.addView(
+                    key,
+                    LinearLayout.LayoutParams(0, dp(KEY_MAX_DP), 1f).apply {
+                        if (i > 0) marginStart = dp(12)
+                    },
+                )
+            }
+            grid.addView(
+                line,
+                LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                ).apply { if (!last) bottomMargin = dp(ROW_GAP_DP) },
+            )
         }
 
-        var index = 0
+        keys.clear()
         // Three rows of three digits.
-        for (row in 0 until 3) {
-            grid.addView(LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER
-                for (col in 0 until 3) {
-                    addView(digitButton(digits[index]))
-                    index++
-                }
-            })
+        for (r in 0 until 3) {
+            row((0 until 3).map { c -> digitKey(digits[r * 3 + c]) }, last = false)
         }
         // Bottom row: backspace, last digit, check.
-        grid.addView(LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-            addView(actionButton("⌫") { onBackspace() })
-            addView(digitButton(digits[9]))
-            addView(actionButton("✓") { onSubmit() })
-        })
+        backspaceKey = iconKey(R.drawable.ic_lock_backspace, "Delete digit", emphasized = false) {
+            onBackspace()
+        }
+        checkKey = iconKey(R.drawable.ic_lock_check, "Unlock", emphasized = true) { onSubmit() }
+        row(listOf(backspaceKey, digitKey(digits[9]), checkKey), last = true)
+        keys += backspaceKey
+        keys += checkKey
         return grid
     }
 
-    private fun digitButton(digit: String): Button = Button(this).apply {
+    /** A digit key: the surface with a hairline edge, like the Flutter keypad. */
+    private fun digitKey(digit: String): View = TextView(this).apply {
         text = digit
-        textSize = 22f
-        setTextColor(color(R.color.lockTextPrimary))
-        setBackgroundColor(Color.TRANSPARENT)
-        layoutParams = LinearLayout.LayoutParams(dp(88), dp(72)).apply {
-            setMargins(dp(6), dp(6), dp(6), dp(6))
-        }
+        textSize = 24f
+        typeface = medium
+        gravity = Gravity.CENTER
+        setTextColor(palette.textPrimary)
+        background = keyBackground(emphasized = false)
         setOnClickListener { onDigit(digit) }
+    }.also { keys += it }
+
+    private fun iconKey(
+        icon: Int,
+        label: String,
+        emphasized: Boolean,
+        onTap: () -> Unit,
+    ): ImageView = ImageView(this).apply {
+        val glyph = ContextCompat.getDrawable(this@LockActivity, icon)!!.mutate()
+        glyph.setTint(if (emphasized) palette.onAccent else palette.textPrimary)
+        setImageDrawable(glyph)
+        scaleType = ImageView.ScaleType.CENTER
+        contentDescription = label
+        background = keyBackground(emphasized)
+        setOnClickListener { onTap() }
     }
 
-    private fun actionButton(label: String, onTap: () -> Unit): Button = Button(this).apply {
-        text = label
-        textSize = 22f
-        setTextColor(color(R.color.lockAccent))
-        setBackgroundColor(Color.TRANSPARENT)
-        layoutParams = LinearLayout.LayoutParams(dp(88), dp(72)).apply {
-            setMargins(dp(6), dp(6), dp(6), dp(6))
+    private fun keyBackground(emphasized: Boolean): Drawable {
+        val p = palette
+        fun shape() = GradientDrawable().apply { cornerRadius = dp(KEY_RADIUS_DP).toFloat() }
+        val fill = shape().apply {
+            if (emphasized) {
+                setColor(p.accent)
+            } else {
+                setColor(p.surface)
+                setStroke(dp(1), p.hairline)
+            }
         }
-        setOnClickListener { onTap() }
+        val ripple = ColorUtils.setAlphaComponent(
+            if (emphasized) p.onAccent else p.textPrimary,
+            31,
+        )
+        return RippleDrawable(ColorStateList.valueOf(ripple), fill, shape().apply { setColor(Color.WHITE) })
+    }
+
+    /** The round tonal fingerprint button (56 dp), as core_lock's LockBiometricButton. */
+    private fun fingerprintButton(): View = ImageView(this).apply {
+        val glyph = ContextCompat.getDrawable(this@LockActivity, R.drawable.ic_lock_fingerprint)!!
+            .mutate()
+        glyph.setTint(palette.accent)
+        setImageDrawable(glyph)
+        scaleType = ImageView.ScaleType.CENTER
+        contentDescription = "Unlock with fingerprint"
+        val circle = GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(palette.accentContainer)
+        }
+        background = RippleDrawable(
+            ColorStateList.valueOf(ColorUtils.setAlphaComponent(palette.accent, 31)),
+            circle,
+            null,
+        )
+        setOnClickListener { triggerBiometric() }
+    }
+
+    /** The small "by Offlyne" endorsement at the bottom of every suite lock. */
+    private fun endorsement(): View = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        addView(text("by ", ENDORSEMENT_SP, regular, palette.textSecondary))
+        addView(text("Offlyne", ENDORSEMENT_SP, semiBold, palette.textSecondary))
+    }
+
+    private fun text(value: String, sp: Float, face: Typeface, color: Int) = TextView(this).apply {
+        text = value
+        textSize = sp
+        typeface = face
+        gravity = Gravity.CENTER
+        setTextColor(color)
+        includeFontPadding = false
+    }
+
+    private fun wrapWidth(top: Int) = LinearLayout.LayoutParams(
+        ViewGroup.LayoutParams.MATCH_PARENT,
+        ViewGroup.LayoutParams.WRAP_CONTENT,
+    ).apply { topMargin = dp(top) }
+
+    /**
+     * Fits the keypad into the [availableWidthPx] × [availableHeightPx] the
+     * root leaves inside the system bars: at most the suite's 380 dp content
+     * width, and keys between the tap target and 64 dp tall next to
+     * everything else on the screen — the same rule as the Flutter keypad.
+     */
+    private fun sizeKeypad(availableWidthPx: Int, availableHeightPx: Int) {
+        val width = minOf(availableWidthPx - dp(48), dp(KEYPAD_MAX_WIDTH_DP))
+        keypad.layoutParams = keypad.layoutParams.apply { this.width = width }
+
+        val fixedDp = 24 + 24 + MARK_DP + 16 + 4 + 32 + DOT_DP + DOT_GAP_DP + ERROR_DP +
+            ERROR_GAP_DP + ROW_GAP_DP * 3 + 20 +
+            (if (store.biometricEnabled()) FINGERPRINT_DP + 32 else 0)
+        val textLines = sp((TITLE_SP + SUBTITLE_SP + ENDORSEMENT_SP) * LINE_HEIGHT)
+        val key = ((availableHeightPx - dp(fixedDp) - textLines) / 4)
+            .coerceIn(dp(KEY_MIN_DP), dp(KEY_MAX_DP))
+        for (k in keys) {
+            k.layoutParams = k.layoutParams.apply { height = key }
+        }
+    }
+
+    /**
+     * The locked app's launcher icon at [sizePx], clipped to the suite tile
+     * shape (a rounded rect with corners of 0.3 × size). Adaptive icons are
+     * drawn from their layers so the device's own icon mask does not show.
+     */
+    private fun appIcon(pkg: String, sizePx: Int): Bitmap {
+        val icon = try {
+            packageManager.getApplicationIcon(pkg)
+        } catch (e: PackageManager.NameNotFoundException) {
+            // The app was uninstalled while its lock was up.
+            packageManager.defaultActivityIcon
+        }
+        val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        val radius = sizePx * TILE_CORNER_FRACTION
+        canvas.clipPath(
+            Path().apply {
+                addRoundRect(
+                    RectF(0f, 0f, sizePx.toFloat(), sizePx.toFloat()),
+                    radius,
+                    radius,
+                    Path.Direction.CW,
+                )
+            },
+        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && icon is AdaptiveIconDrawable) {
+            // Layers are 108 dp with the visible 72 dp in the middle, so they
+            // overflow the tile by a quarter of its size on each side.
+            val bleed = sizePx / 4
+            for (layer in listOfNotNull(icon.background, icon.foreground)) {
+                layer.setBounds(-bleed, -bleed, sizePx + bleed, sizePx + bleed)
+                layer.draw(canvas)
+            }
+        } else {
+            icon.setBounds(0, 0, sizePx, sizePx)
+            icon.draw(canvas)
+        }
+        return bitmap
+    }
+
+    /** Colours the status and navigation bars like the lock background. */
+    private fun applyWindowColors() {
+        val p = palette
+        window.setBackgroundDrawable(ColorDrawable(p.background))
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        @Suppress("DEPRECATION")
+        window.statusBarColor = p.background
+        @Suppress("DEPRECATION")
+        window.navigationBarColor = p.background
+        WindowCompat.getInsetsController(window, window.decorView).apply {
+            isAppearanceLightStatusBars = !p.isDark
+            isAppearanceLightNavigationBars = !p.isDark
+        }
     }
 
     private fun buildDecoyView(): View {
@@ -296,15 +518,17 @@ class LockActivity : FragmentActivity() {
 
     private fun startCooldown(seconds: Int) {
         locked = true
+        updateDots()
         var remaining = seconds
         val runnable = object : Runnable {
             override fun run() {
                 if (remaining <= 0) {
                     locked = false
                     messageView.text = ""
+                    updateDots()
                     return
                 }
-                messageView.text = "Too many attempts. Try again in ${remaining}s"
+                messageView.text = "Too many attempts. Try again in ${countdown(remaining)}."
                 remaining--
                 handler.postDelayed(this, 1000)
             }
@@ -317,11 +541,34 @@ class LockActivity : FragmentActivity() {
         finish()
     }
 
+    /** Redraws the PIN dots (filled accent / 1.5 dp outline) and dims the keys that cannot act. */
     private fun updateDots() {
-        val shown = if (pin.isEmpty()) MIN_PIN else pin.length
-        val filled = "●".repeat(pin.length)
-        val empty = "○".repeat((shown - pin.length).coerceAtLeast(0))
-        dotsView.text = filled + empty
+        val shown = maxOf(pin.length, MIN_PIN)
+        dotsRow.removeAllViews()
+        for (i in 0 until shown) {
+            val dot = View(this).apply {
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
+                    if (i < pin.length) {
+                        setColor(palette.accent)
+                    } else {
+                        setStroke((1.5f * resources.displayMetrics.density).toInt(), palette.textSecondary)
+                    }
+                }
+            }
+            dotsRow.addView(
+                dot,
+                LinearLayout.LayoutParams(dp(DOT_DP), dp(DOT_DP)).apply {
+                    marginStart = dp(6)
+                    marginEnd = dp(6)
+                },
+            )
+        }
+        for (key in keys) key.alpha = if (locked) DISABLED_ALPHA else 1f
+        if (!locked) {
+            backspaceKey.alpha = if (pin.isEmpty()) DISABLED_ALPHA else 1f
+            checkKey.alpha = if (pin.length < MIN_PIN) DISABLED_ALPHA else 1f
+        }
     }
 
     // --- Biometric ----------------------------------------------------------
@@ -403,6 +650,9 @@ class LockActivity : FragmentActivity() {
 
     private fun color(id: Int): Int = ContextCompat.getColor(this, id)
 
+    private fun sp(value: Float): Int =
+        TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, value, resources.displayMetrics).toInt()
+
     private fun dp(value: Int): Int =
         (value * resources.displayMetrics.density).toInt()
 
@@ -413,6 +663,29 @@ class LockActivity : FragmentActivity() {
 
     companion object {
         const val EXTRA_PACKAGE = "package"
+
+        // Layout sizes (dp) shared with the Flutter lock (core_lock LockLayout
+        // and OpenLock's PinEntryPanel).
+        private const val MARK_DP = 64
+        private const val TILE_CORNER_FRACTION = 0.3f
+        private const val DOT_DP = 14
+        private const val DOT_GAP_DP = 6
+        private const val ERROR_DP = 16
+        private const val ERROR_GAP_DP = 8
+        private const val ROW_GAP_DP = 8
+        private const val KEY_MIN_DP = 48
+        private const val KEY_MAX_DP = 64
+        private const val KEY_RADIUS_DP = 14
+        private const val KEYPAD_MAX_WIDTH_DP = 332
+        private const val FINGERPRINT_DP = 56
+        private const val TITLE_SP = 24f
+        private const val SUBTITLE_SP = 14f
+        private const val ENDORSEMENT_SP = 13f
+        private const val LINE_HEIGHT = 1.25f
+        private const val DISABLED_ALPHA = 0.4f
+
+        /** A cooldown as a countdown clock, "0:28" or "4:05", as formatLockCountdown. */
+        private fun countdown(seconds: Int): String = "%d:%02d".format(seconds / 60, seconds % 60)
         private const val MIN_PIN = 6
         private const val MAX_FREE_ATTEMPTS = 5
 
