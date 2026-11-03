@@ -1,0 +1,1 @@
+No dark flash on the lock overlay, a randomized keypad everywhere, a phone-order keypad in the overlay, and a tidier app list.

@@ -1,0 +1,40 @@
+Most app lockers ask for sign-ups, show ads, or phone home with the list of apps you hide. OpenLock has no servers. Which apps you lock, your schedules, your PIN verifier and any intruder photos stay on your phone, encrypted. No account, no cloud, no tracking, no ads.
+
+LOCK WHAT MATTERS
+- Pick any installed app from a searchable list and lock it behind your PIN or fingerprint.
+- Lock newly installed apps automatically.
+- Choose when apps relock: the moment you leave, after 1, 5, 15 or 30 minutes, or when the screen turns off.
+
+FOCUS SCHEDULES
+- Lock a chosen set of apps during time windows, for example social apps from 9 to 5 on weekdays.
+- Weekday sets, overnight windows and all-day rules, enforced automatically.
+
+UNINSTALL PROTECTION
+- Turn on Prevent uninstall so OpenLock cannot be removed on a whim. Android refuses the uninstall until you switch protection off with your PIN or fingerprint.
+- It is a deterrent, not a guarantee: someone with ADB, Safe Mode or a factory reset can still remove the app.
+
+STAY IN CONTROL
+- Intruder log: after too many wrong attempts, OpenLock snaps a front-camera photo and logs the time and app (optional).
+- Optional randomized keypad and masked PIN against shoulder surfing.
+- Escalating cooldown after repeated wrong guesses.
+- Optional decoy cover that shows a fake "app has stopped" dialog.
+- Optionally hide the notification content of locked apps.
+- Encrypted backup and restore protected by a passphrase of your choosing.
+
+HOW IT WORKS
+A foreground service watches which app is in front using Android's usage statistics. When a locked app opens, OpenLock shows its lock screen on top. The PIN is checked against a stored hash entirely on the device.
+
+PERMISSIONS, IN PLAIN WORDS
+OpenLock explains each one on a guided checklist inside the app.
+- Usage access (required): lets OpenLock see which app is in the foreground so it can catch a locked app.
+- Display over other apps (required): lets OpenLock draw the lock screen on top of the locked app.
+- Notifications and foreground service: the ongoing "protection active" notice that keeps the guard running.
+- Run at boot: restarts protection after the phone restarts.
+- Query all packages: lists the apps you can choose to lock. Labels, icons and package names are read locally and never leave the device.
+- Accessibility service (optional): only for the uninstall-screen guard. It reads Settings and package-installer windows to tell whether they are about OpenLock, and shows the lock screen over them. Nothing is stored or sent.
+- Notification access (optional): only to hide the notification content of apps you lock.
+- Device administrator (optional): only if you enable Prevent uninstall. It is what makes Android block the uninstall. OpenLock never locks, wipes or manages your device.
+- Camera (optional): only for intruder photos.
+- Ignore battery optimization (optional): keeps the guard alive on aggressive phone makers' systems.
+
+Cross-app locking is Android-only by platform design. Free and open source under the MIT license.
