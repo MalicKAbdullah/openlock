@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:openlock/src/core/di.dart';
 import 'package:openlock/src/core/interfaces/enforcement_bridge.dart';
+import 'package:openlock/src/core/store_build.dart';
 import 'package:openlock/src/core/widgets/screen_header.dart';
 import 'package:openlock/src/features/apps/providers/apps_providers.dart';
 import 'package:openlock/src/features/enforcement/models/lock_config.dart';
@@ -123,7 +124,7 @@ class AppPickerScreen extends ConsumerWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const _UpdateBannerCard(),
+            if (!kStoreBuild) const _UpdateBannerCard(),
             _ProtectionHero(
               config: config,
               lockedCount: lockedCount,

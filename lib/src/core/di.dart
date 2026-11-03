@@ -10,6 +10,7 @@ import 'package:openlock/src/core/interfaces/biometric_auth.dart';
 import 'package:openlock/src/core/interfaces/config_file_store.dart';
 import 'package:openlock/src/core/interfaces/enforcement_bridge.dart';
 import 'package:openlock/src/core/interfaces/key_derivation.dart';
+import 'package:openlock/src/core/store_build.dart';
 import 'package:openlock/src/core/services/method_channel_enforcement_bridge.dart';
 import 'package:openlock/src/features/auth/services/biometric_service.dart';
 import 'package:openlock/src/features/auth/services/pin_auth_service.dart';
@@ -106,6 +107,7 @@ final updateAutoCheckProvider = FutureProvider<bool>(
 
 /// The pending update (null when disabled, up to date, or offline).
 final updateCheckProvider = FutureProvider<UpdateInfo?>((ref) async {
+  if (kStoreBuild) return null;
   if (!await ref.watch(updateAutoCheckProvider.future)) return null;
   return ref.watch(updateServiceProvider).check();
 });
