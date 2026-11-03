@@ -64,6 +64,8 @@ jobs:
 
       - name: Build signed APKs
         run: |
+          flutter build apk --release --dart-define=OFFLYNE_STORE=fdroid
+          cp build/app/outputs/flutter-apk/app-release.apk "$RUNNER_TEMP/store.apk"
           flutter build apk --release
           flutter build apk --release --split-per-abi
 
@@ -77,6 +79,7 @@ jobs:
           [ -z "$VER" ] && VER="dev"
           mkdir -p dist
           cp build/app/outputs/flutter-apk/app-release.apk "dist/${APP}-${VER}-universal.apk"
+          cp "$RUNNER_TEMP/store.apk" "dist/${APP}-${VER}-store.apk"
           for abi in arm64-v8a armeabi-v7a x86_64; do
             f="build/app/outputs/flutter-apk/app-${abi}-release.apk"
             [ -f "$f" ] && cp "$f" "dist/${APP}-${VER}-${abi}.apk"

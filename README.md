@@ -137,6 +137,21 @@ flutter test
 
 **App icon:** a launcher icon can be dropped into `assets/icon/` and wired up with `flutter_launcher_icons` later; the current build ships the default adaptive icon.
 
+## 🏬 Store builds (F-Droid / IzzyOnDroid)
+
+F-Droid and IzzyOnDroid deliver updates themselves, so their build is made with a
+compile-time flag:
+
+```sh
+flutter build apk --release --dart-define=OFFLYNE_STORE=fdroid
+```
+
+With `OFFLYNE_STORE=fdroid` OpenLock removes the **Check for updates** rows in Settings,
+the home **update banner**, and every automatic update request. Without the flag
+(the default, and what the GitHub Release APKs use) the in-app updater is on.
+Fastlane listing text and screenshots live in
+[`fastlane/metadata/android/en-US`](fastlane/metadata/android/en-US).
+
 ## 🧱 Built With
 
 - **Flutter** & **Dart** — the app UI, config, schedules, and all the pure-Dart lock logic

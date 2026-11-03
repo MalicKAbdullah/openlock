@@ -43,3 +43,19 @@ to debug signing unless you create your own `android/key.properties`.
 ## Versioning
 
 Tags are `vMAJOR.MINOR.PATCH` and should match the `version:` in `pubspec.yaml`.
+
+## Store builds (F-Droid / IzzyOnDroid)
+
+Store builds pass `--dart-define=OFFLYNE_STORE=fdroid`. That removes the
+**Check for updates** Settings rows, the home update banner and all automatic
+update requests (see `lib/src/core/store_build.dart`); the stores handle
+updates. A build without the flag is the GitHub build and keeps the in-app updater.
+
+- The [`Release`](.github/workflows/release.yml) workflow also builds a universal
+  store APK and attaches it to the GitHub Release as `openlock-<tag>-store.apk`. That is the
+  asset IzzyOnDroid picks up.
+- F-Droid builds from source at the release tag with the same flag; its metadata
+  draft is kept outside the repo (submitted to `fdroiddata`).
+- Listing text, icon, feature graphic, screenshots and per-release changelogs are
+  in `fastlane/metadata/android/en-US/`. Each release needs a
+  `changelogs/<versionCode>.txt` (the `+N` in `pubspec.yaml`), at most 500 bytes.
