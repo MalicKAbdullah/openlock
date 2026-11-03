@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:openlock/src/core/di.dart';
 import 'package:openlock/src/core/router/app_router.dart';
+import 'package:openlock/src/core/store_build.dart';
 import 'package:openlock/src/core/widgets/screen_header.dart';
 import 'package:openlock/src/features/enforcement/models/lock_config.dart';
 import 'package:openlock/src/features/enforcement/models/relock_policy.dart';
@@ -418,7 +419,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
             const SectionLead('Updates'),
             RowGroup(
               children: [
-                const _UpdateTiles(),
+                if (!kStoreBuild) const _UpdateTiles(),
                 SettingsTile(
                   icon: Icons.info_outline,
                   title: 'About',
